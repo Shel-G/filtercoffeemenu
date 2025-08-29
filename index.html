@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEA Cupping · 互动地图 + 豆子卡片</title>
+<meta name="description" content="Southeast Asia coffee cupping interactive map and card carousel">
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/swiper@10/swiper-bundle.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1216; --panel:#141a22; --ink:#e8eef6; --sub:#b6c2d0; --accent:#7fd1ae; --border:#213044;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0}
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+  .wrap{width:min(1180px,94vw); margin:14px auto; display:grid; gap:12px}
+  header{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap}
+  h1{font-size:clamp(22px,3vw,32px); margin:0}
+  .chips{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.06); border:1px solid var(--border); color:#fff; border-radius:999px; padding:8px 12px; cursor:pointer; font-weight:700}
+  .chip.active{background:linear-gradient(135deg,var(--accent),#57b894); color:#0c1116; border:none}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,.35)}
+  #map{height:360px; border-radius:16px}
+  .grid{display:grid; grid-template-columns:1fr}
+  .swiper{width:100%; padding:12px}
+  .swiper-slide{display:flex; justify-content:center}
+  .card{width:min(820px,100%); background:#0c1015; border:1px solid var(--border); border-radius:16px; overflow:hidden}
+  .fig{height:360px; background:#0a0e12; display:grid; place-items:center}
+  .fig img{width:100%; height:100%; object-fit:cover}
+  .body{padding:14px 16px 16px}
+  .title{margin:0 0 6px; font-size:20px}
+  .meta{color:var(--sub); font-size:14px; margin:0; padding:0; list-style:none}
+  .meta li{margin:4px 0}
+  footer{color:var(--sub); text-align:center; padding:12px 0 22px}
+  .hint{color:var(--sub); font-size:14px; margin:2px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SEA Cupping • 互动地图 + 豆子卡片</h1>
+    <div class="chips">
+      <button class="chip active" data-filter="">全部</button>
+      <button class="chip" data-filter="新加坡 🇸🇬">新加坡 🇸🇬</button>
+      <button class="chip" data-filter="马来西亚 🇲🇾">马来西亚 🇲🇾</button>
+      <button class="chip" data-filter="泰国 🇹🇭">泰国 🇹🇭</button>
+    </div>
+  </header>
+
+  <div class="hint">点击地图上的标记，或点上方筛选，下面的卡片会自动切换到对应国家。</div>
+
+  <section id="map" class="panel"></section>
+
+  <section class="panel grid">
+    <div class="swiper">
+      <div class="swiper-wrapper" id="slides"></div>
+      <div class="swiper-pagination"></div>
+      <div class="swiper-button-prev"></div>
+      <div class="swiper-button-next"></div>
+    </div>
+  </section>
+
+  <footer>© 2025 · SEA Cupping · Demo — 可将数据替换为你的 14 款豆子</footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/swiper@10/swiper-bundle.min.js"></script>
+<script>
+// Use GitHub images
+const getImageUrl = (id) => 
+  `https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/main/${id}.png`;
+
+const BEANS = [
+  {id:'sg-nylon', country:'新加坡 🇸🇬', city:'Singapore', roaster:'Nylon Coffee Roasters', title:'House Blend / Single Origin', process:'Washed / Natural', variety:['Bourbon','Typica'], flavors:['柑橘','可可','坚果'], image:getImageUrl('sg-nylon'), lat:1.2966, lng:103.8485},
+  {id:'sg-fluid', country:'新加坡 🇸🇬', city:'Singapore', roaster:'Fluid', title:'Peru Gesha', process:'Washed', variety:['Gesha'], flavors:['草莓','桃子','花茶'], image:getImageUrl('sg-fluid'), lat:1.3005, lng:103.8597},
+  {id:'my-vcr', country:'马来西亚 🇲🇾', city:'Kuala Lumpur', roaster:'VCR Coffee Roasters', title:'Anaerobic Process', process:'Anaerobic', variety:['-'], flavors:['百香果','黄葡萄干','杏'], image:getImageUrl('my-vcr'), lat:3.1390, lng:101.6869},
+  {id:'my-artisan', country:'马来西亚 🇲🇾', city:'Kuala Lumpur', roaster:'Artisan Roast TTDI', title:'Ethiopia Gomoro Guji G1', process:'—', variety:['—'], flavors:['橙汁','芒果','柠檬糖果'], image:getImageUrl('my-artisan'), lat:3.1402, lng:101.6211},
+  {id:'th-graph', country:'泰国 🇹🇭', city:'Chiang Mai', roaster:'Graph Coffee Co.', title:'Mae Chaem · Filter', process:'传统水洗', variety:['Catimor','Catuai','Typica'], flavors:['红茶','红糖','凤梨','菠萝蜜'], image:getImageUrl('th-graph'), lat:18.7883, lng:98.9853},
+  {id:'th-akha', country:'泰国 🇹🇭', city:'Chiang Rai', roaster:'Akha Ama Phrasingh', title:'Doi Chang · Washed', process:'水洗', variety:['Typica','Catimor','Mix'], flavors:['莲雾','西瓜','杨桃'], image:getImageUrl('th-akha'), lat:19.9072, lng:99.8309},
+  {id:'th-lot', country:'泰国 🇹🇭', city:'Tak', roaster:'Lot of Taste', title:'Le Tor Gold · Natural', process:'日晒', variety:['Catimor','Catuai','Typica'], flavors:['玫瑰','树莓','西梅','葡萄酒','回甘'], image:getImageUrl('th-lot'), lat:16.8785, lng:99.1256},
+];
+
+const map = L.map('map', {scrollWheelZoom:false}).setView([8.1, 105.0], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '&copy; OpenStreetMap'}).addTo(map);
+
+const markers = [];
+BEANS.forEach((b) => {
+  const m = L.marker([b.lat, b.lng]).addTo(map).bindPopup(`<strong>${b.roaster}</strong><br>${b.city} · ${b.country}<br>${b.title}`);
+  m.on('click', () => focusCountry(b.country));
+  markers.push(m);
+});
+
+const slidesEl = document.getElementById('slides');
+function renderSlides(list){
+  slidesEl.innerHTML = list.map(b => `
+    <div class="swiper-slide">
+      <article class="card">
+        <div class="fig"><img src="${b.image}" alt="${b.title}"></div>
+        <div class="body">
+          <h3 class="title">${b.roaster} — ${b.title}</h3>
+          <ul class="meta">
+            <li>国家：${b.country}｜城市：${b.city}</li>
+            <li>处理法：${b.process}</li>
+            <li>豆种：${b.variety.join(', ')}</li>
+            <li>风味：${b.flavors.join('，')}</li>
+          </ul>
+        </div>
+      </article>
+    </div>`).join('');
+}
+renderSlides(BEANS);
+
+let swiper = new Swiper('.swiper', {
+  slidesPerView: 1,
+  spaceBetween: 12,
+  loop: false,
+  pagination: { el: '.swiper-pagination', clickable: true },
+  navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+});
+
+function focusCountry(country){
+  const list = country ? BEANS.filter(b => b.country === country) : BEANS;
+  renderSlides(list);
+  swiper.update();
+  if (list.length) swiper.slideTo(0);
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.filter === (country||'')));
+}
+
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    focusCountry(chip.dataset.filter || '');
+  });
+});
+</script>
+</body>
+</html>
