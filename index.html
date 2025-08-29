@@ -11,6 +11,14 @@
             font-family: 'Inter', sans-serif;
             background-color: #1a202c;
         }
+        .filter-btn.active {
+            background-color: #4a5568; /* Tailwind gray-700 */
+        }
+        .group-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -21,7 +29,7 @@
         </div>
 
         <div id="filter-buttons" class="flex flex-wrap justify-center gap-4 mb-8">
-            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="country">按国家</button>
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 active" data-filter="country">按国家</button>
             <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="process">按处理法</button>
             <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="roaster">按烘焙商</button>
             <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="variety">按豆种</button>
@@ -42,8 +50,8 @@
             { "country_cn": "泰国", "region": "Tak", "variety": "Catimor, Catuai, Typica", "roaster": "Lot of Taste", "process": "日晒", "flavor": "李子，蔗糖，黑葡萄干，余韵回甘", "image_id": 5 },
             { "country_cn": "泰国", "region": "Tak", "variety": "Catimor, Catuai, Typica", "roaster": "Lot of Taste", "process": "日晒", "flavor": "玫瑰，树莓，西梅，葡萄酒，余韵回甘", "image_id": 6 },
             { "country_cn": "泰国", "region": "Mae chaem, Chiang Mai", "variety": "Catimor, Catuai, Typica", "roaster": "Graph Coffee Co.", "process": "传统水洗", "flavor": "红茶，红糖，凤梨，菠萝蜜", "image_id": 7 },
-            { "country_cn": "泰国", "region": "Maejan Tai, Chiang Rai", "variety": "Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "日晒", "flavor": "莲雾，西瓜，杨桃", "image_id": 8 },
-            { "country_cn": "泰国", "region": "Doi Chang, Chiang Rai", "variety": "Typica, Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "水洗", "flavor": "风味描述缺失", "image_id": 9 },
+            { "country_cn": "泰国", "region": "Maejan Tai, Chiang Rai", "variety": "Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "日晒", "flavor": "巧克力布朗尼，葡萄干，肉桂，热红酒，百香果", "image_id": 8 },
+            { "country_cn": "泰国", "region": "Doi Chang, Chiang Rai", "variety": "Typica, Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "水洗", "flavor": "莲雾，西瓜，杨桃", "image_id": 9 },
             { "country_cn": "秘鲁", "region": "-", "variety": "Gesha", "roaster": "Fluid", "process": "水洗", "flavor": "草莓，罐头桃，花茶", "image_id": 10 },
             { "country_cn": "印度尼西亚", "region": "Kintamani, Bali", "variety": "USDA, Cobra, Kopyol", "roaster": "Tiong Hoe Specialty Coffee", "process": "传统水洗", "flavor": "红糖，甘蔗，干柿子", "image_id": 11 },
             { "country_cn": "尼加拉瓜", "region": "Jinotega", "variety": "Catuai, Parainema", "roaster": "Cloud Catcher Coffee", "process": "水洗", "flavor": "莲雾，木槿花，蜜桃，橙", "image_id": 12 },
@@ -55,19 +63,64 @@
 
         const emojiMap = {
             '柑橘': '🍊', '橙': '🍊', '柠檬': '🍋', '红茶': '☕️', '花茶': '🌸',
-            '草莓': '🍓', '西瓜': '🍉', '苹果': '🍎', '蜜桃': '🍑', '黑樱桃': '🍒',
-            '莲雾': '🍎', '树莓': '🍓', '杨桃': '⭐', '凤梨': '🍍', '菠萝蜜': '🍍',
-            '李子': '🍑', '西梅': '🍑', '黑葡萄干': '🍇', '葡萄': '🍇', '黑布林': '🍇',
-            '黄葡萄干': '🍇', '芒果': '🥭', '百香果': ' Passion Fruit', '红枣': 'Dates',
-            '干柿子': 'Dried Persimmons', '巧克力': '🍫', '可可': '🍫', '红糖': '🟤',
-            '蔗糖': '🟤', '甘蔗': '🟤', '肉桂': ' Sticks', '余韵回甘': 'Sweet aftertaste',
-            '花香': '🌸', '坚果': '🌰', '朗姆酒': '🍷', '葡萄酒': '🍷', '木槿花': '🌸',
-            '泡泡糖': 'Gum'
+            '草莓': '🍓', '西瓜': '🍉', '苹果': '🍎', '蜜桃': '🍑', '樱桃': '🍒',
+            '树莓': '🍓', '杨桃': '⭐', '凤梨': '🍍', '菠萝蜜': '🍍',
+            '葡萄': '🍇',
+            '芒果': '🥭', 
+            '巧克力': '🍫', '可可': '🍫', '红糖': '🟤',
+            '蔗糖': '🟤', '甘蔗': '🟤',
+            '花香': '🌸', '坚果': '🌰', '葡萄酒': '🍷', '木槿花': '🌸',
+            '泡泡糖': '🫧', '罐头桃': '🍑', 
         };
 
         const countryFlags = {
             '马来西亚': '🇲🇾', '萨尔瓦多': '🇸🇻', '泰国': '🇹🇭', '秘鲁': '🇵🇪',
             '印度尼西亚': '🇮🇩', '尼加拉瓜': '🇳🇮', '埃塞俄比亚': '🇪🇹', '坦桑尼亚': '🇹🇿'
+        };
+
+        // 根据风味描述，将咖啡豆分组到特定的风味类别中
+        const getFlavorGroups = (beans) => {
+            const groups = {
+                '水果风味': [],
+                '坚果/巧克力风味': [],
+                '茶/草本风味': [],
+                '甜味/其他': []
+            };
+
+            const flavorKeywords = {
+                '水果风味': ['橙', '柠檬', '草莓', '西瓜', '蜜桃', '黑樱桃', '莲雾', '树莓', '杨桃', '凤梨', '菠萝蜜', '李子', '西梅', '葡萄', '黑布林', '百香果', '杏', '芒果', '罐头桃', '红樱桃'],
+                '坚果/巧克力风味': ['巧克力', '可可'],
+                '茶/草本风味': ['红茶', '花茶', '甜菊'],
+                '甜味/其他': ['红糖', '蔗糖', '甘蔗', '干柿子', '余韵回甘', '泡泡糖', '红枣', '朗姆酒', '葡萄酒', '肉桂', '玫瑰']
+            };
+
+            beans.forEach(bean => {
+                for (const group in flavorKeywords) {
+                    const hasFlavor = flavorKeywords[group].some(keyword => bean.flavor.includes(keyword));
+                    if (hasFlavor) {
+                        groups[group].push(bean);
+                        break; // 找到匹配的组后就跳出
+                    }
+                }
+            });
+            return groups;
+        };
+        
+        // 通用分组函数，根据传入的字段名对咖啡豆进行分组
+        const groupData = (beans, filterBy) => {
+            if (filterBy === 'flavor') {
+                return getFlavorGroups(beans);
+            }
+            
+            const grouped = {};
+            beans.forEach(bean => {
+                const key = bean[filterBy === 'country' ? 'country_cn' : filterBy];
+                if (!grouped[key]) {
+                    grouped[key] = [];
+                }
+                grouped[key].push(bean);
+            });
+            return grouped;
         };
 
         function getFlavorWithEmojis(flavor) {
@@ -85,7 +138,7 @@
             const flag = countryFlags[bean.country_cn] || '';
             const card = `
                 <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden transform transition-transform duration-300 hover:scale-105">
-                    <img src="${getImageUrl(bean.image_id)}" alt="${bean.roaster}" class="w-full h-48 object-cover object-center">
+                    <img src="${getImageUrl(bean.image_id)}" alt="${bean.roaster}" class="w-full h-64 object-cover object-center">
                     <div class="p-4">
                         <h3 class="text-xl font-bold mb-2 truncate">${bean.region}</h3>
                         <div class="text-sm space-y-1">
@@ -105,55 +158,10 @@
             const container = document.getElementById('content-container');
             container.innerHTML = '';
             
-            let groupedData = {};
+            const groupedData = groupData(coffeeBeans, filterBy);
 
-            if (filterBy === 'flavor') {
-                const flavorGroups = {
-                    '水果风味': ['橙', '柠檬', '草莓', '西瓜', '蜜桃', '黑樱桃', '莲雾', '树莓', '杨桃', '凤梨', '菠萝蜜', '李子', '西梅', '葡萄', '黑布林', '百香果', '杏', '芒果'],
-                    '坚果/巧克力风味': ['巧克力', '可可'],
-                    '茶/草本风味': ['红茶', '花茶', '甜菊'],
-                    '甜味/其他': ['红糖', '蔗糖', '甘蔗', '干柿子', '余韵回甘', '泡泡糖', '红枣', '朗姆酒', '葡萄酒', '肉桂', '玫瑰']
-                };
-
-                for (const group in flavorGroups) {
-                    groupedData[group] = [];
-                }
-
-                coffeeBeans.forEach(bean => {
-                    for (const group in flavorGroups) {
-                        const hasFlavor = flavorGroups[group].some(flavor => bean.flavor.includes(flavor));
-                        if (hasFlavor) {
-                            groupedData[group].push(bean);
-                        }
-                    }
-                });
-
-                for (const group in groupedData) {
-                    if (groupedData[group].length > 0) {
-                        const groupTitle = document.createElement('h2');
-                        groupTitle.className = 'text-2xl font-bold mt-8 mb-4 border-b-2 border-gray-700 pb-2';
-                        groupTitle.textContent = group;
-                        container.appendChild(groupTitle);
-
-                        const groupGrid = document.createElement('div');
-                        groupGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
-                        groupedData[group].forEach(bean => {
-                            groupGrid.innerHTML += createCard(bean);
-                        });
-                        container.appendChild(groupGrid);
-                    }
-                }
-
-            } else {
-                coffeeBeans.forEach(bean => {
-                    const key = bean[filterBy === 'country' ? 'country_cn' : filterBy];
-                    if (!groupedData[key]) {
-                        groupedData[key] = [];
-                    }
-                    groupedData[key].push(bean);
-                });
-
-                for (const key in groupedData) {
+            for (const key in groupedData) {
+                if (groupedData[key].length > 0) {
                     const groupTitle = document.createElement('h2');
                     groupTitle.className = 'text-2xl font-bold mt-8 mb-4 border-b-2 border-gray-700 pb-2';
                     const flag = countryFlags[key] || '';
@@ -161,7 +169,7 @@
                     container.appendChild(groupTitle);
 
                     const groupGrid = document.createElement('div');
-                    groupGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                    groupGrid.className = 'group-card-grid';
                     groupedData[key].forEach(bean => {
                         groupGrid.innerHTML += createCard(bean);
                     });
@@ -171,15 +179,20 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.filter-btn').forEach(button => {
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            
+            filterButtons.forEach(button => {
                 button.addEventListener('click', (e) => {
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
                     const filter = e.target.dataset.filter;
                     renderContent(filter);
                 });
             });
-            // Initial render
+            // 页面加载时默认按国家筛选
             renderContent('country');
         });
     </script>
 </body>
 </html>
+
