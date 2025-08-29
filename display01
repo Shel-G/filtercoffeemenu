@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>咖啡豆聚合信息</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto p-4">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold mb-2">咖啡豆聚合信息</h1>
+            <p class="text-gray-400">以下是按不同维度整理的咖啡豆概览</p>
+        </div>
+
+        <div id="filter-buttons" class="flex flex-wrap justify-center gap-4 mb-8">
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="country">按国家</button>
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="process">按处理法</button>
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="roaster">按烘焙商</button>
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="variety">按豆种</button>
+            <button class="filter-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200" data-filter="flavor">按风味</button>
+        </div>
+
+        <div id="content-container">
+            <!-- Aggregated content will be injected here -->
+        </div>
+    </div>
+
+    <script>
+        const coffeeBeans = [
+            { "country_cn": "马来西亚", "region": "Johor", "variety": "Peaberry", "roaster": "One Half", "process": "JH 日晒 12天", "flavor": "甜菊，龙眼，红毛丹，莲心果，莎士", "image_id": 1 },
+            { "country_cn": "马来西亚", "region": "Johor N26 Lot 1", "variety": "Liberaca", "roaster": "Cloud Catcher Coffee", "process": "厌氧日晒 26天发酵", "flavor": "黑樱桃，泡泡糖，红枣，甜菊", "image_id": 2 },
+            { "country_cn": "萨尔瓦多", "region": "Santa Ana", "variety": "Bourbon", "roaster": "VCR Coffee Roasters", "process": "厌氧处理", "flavor": "百香果，黄葡萄干，杏", "image_id": 3 },
+            { "country_cn": "泰国", "region": "Hua Chang", "variety": "Catuai, Typica", "roaster": "Curate Coffee Roasters", "process": "日晒酵母发酵", "flavor": "朗姆酒，红樱桃，巧克力", "image_id": 4 },
+            { "country_cn": "泰国", "region": "Tak", "variety": "Catimor, Catuai, Typica", "roaster": "Lot of Taste", "process": "日晒", "flavor": "李子，蔗糖，黑葡萄干，余韵回甘", "image_id": 5 },
+            { "country_cn": "泰国", "region": "Tak", "variety": "Catimor, Catuai, Typica", "roaster": "Lot of Taste", "process": "日晒", "flavor": "玫瑰，树莓，西梅，葡萄酒，余韵回甘", "image_id": 6 },
+            { "country_cn": "泰国", "region": "Mae chaem, Chiang Mai", "variety": "Catimor, Catuai, Typica", "roaster": "Graph Coffee Co.", "process": "传统水洗", "flavor": "红茶，红糖，凤梨，菠萝蜜", "image_id": 7 },
+            { "country_cn": "泰国", "region": "Maejan Tai, Chiang Rai", "variety": "Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "日晒", "flavor": "莲雾，西瓜，杨桃", "image_id": 8 },
+            { "country_cn": "泰国", "region": "Doi Chang, Chiang Rai", "variety": "Typica, Catimor, Mix", "roaster": "Akha Ama Phrasingh", "process": "水洗", "flavor": "风味描述缺失", "image_id": 9 },
+            { "country_cn": "秘鲁", "region": "-", "variety": "Gesha", "roaster": "Fluid", "process": "水洗", "flavor": "草莓，罐头桃，花茶", "image_id": 10 },
+            { "country_cn": "印度尼西亚", "region": "Kintamani, Bali", "variety": "USDA, Cobra, Kopyol", "roaster": "Tiong Hoe Specialty Coffee", "process": "传统水洗", "flavor": "红糖，甘蔗，干柿子", "image_id": 11 },
+            { "country_cn": "尼加拉瓜", "region": "Jinotega", "variety": "Catuai, Parainema", "roaster": "Cloud Catcher Coffee", "process": "水洗", "flavor": "莲雾，木槿花，蜜桃，橙", "image_id": 12 },
+            { "country_cn": "埃塞俄比亚", "region": "Gomoro Guji G1", "variety": "-", "roaster": "Artisan Roast Coffee", "process": "-", "flavor": "橙汁，芒果，柠檬味糖果", "image_id": 13 },
+            { "country_cn": "坦桑尼亚", "region": "-", "variety": "Bourbon (N39)", "roaster": "Nylon Coffee Roasters", "process": "水洗", "flavor": "干浆果，黑布林，黑葡萄", "image_id": 14 }
+        ];
+
+        const getImageUrl = (id) => `https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/49472810436c8a88974b8f9884ddcc25f74872c4/${id}.png`;
+
+        const emojiMap = {
+            '柑橘': '🍊', '橙': '🍊', '柠檬': '🍋', '红茶': '☕️', '花茶': '🌸',
+            '草莓': '🍓', '西瓜': '🍉', '苹果': '🍎', '蜜桃': '🍑', '黑樱桃': '🍒',
+            '莲雾': '🍎', '树莓': '🍓', '杨桃': '⭐', '凤梨': '🍍', '菠萝蜜': '🍍',
+            '李子': '🍑', '西梅': '🍑', '黑葡萄干': '🍇', '葡萄': '🍇', '黑布林': '🍇',
+            '黄葡萄干': '🍇', '芒果': '🥭', '百香果': ' Passion Fruit', '红枣': 'Dates',
+            '干柿子': 'Dried Persimmons', '巧克力': '🍫', '可可': '🍫', '红糖': '🟤',
+            '蔗糖': '🟤', '甘蔗': '🟤', '肉桂': ' Sticks', '余韵回甘': 'Sweet aftertaste',
+            '花香': '🌸', '坚果': '🌰', '朗姆酒': '🍷', '葡萄酒': '🍷', '木槿花': '🌸',
+            '泡泡糖': 'Gum'
+        };
+
+        const countryFlags = {
+            '马来西亚': '🇲🇾', '萨尔瓦多': '🇸🇻', '泰国': '🇹🇭', '秘鲁': '🇵🇪',
+            '印度尼西亚': '🇮🇩', '尼加拉瓜': '🇳🇮', '埃塞俄比亚': '🇪🇹', '坦桑尼亚': '🇹🇿'
+        };
+
+        function getFlavorWithEmojis(flavor) {
+            let result = flavor;
+            for (const key in emojiMap) {
+                const emoji = emojiMap[key];
+                const regex = new RegExp(key, 'g');
+                result = result.replace(regex, `${key}${emoji}`);
+            }
+            return result;
+        }
+
+        function createCard(bean) {
+            const flavorHtml = getFlavorWithEmojis(bean.flavor);
+            const flag = countryFlags[bean.country_cn] || '';
+            const card = `
+                <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden transform transition-transform duration-300 hover:scale-105">
+                    <img src="${getImageUrl(bean.image_id)}" alt="${bean.roaster}" class="w-full h-48 object-cover object-center">
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold mb-2 truncate">${bean.region}</h3>
+                        <div class="text-sm space-y-1">
+                            <p><span class="font-semibold text-gray-400">国家:</span> ${bean.country_cn} ${flag}</p>
+                            <p><span class="font-semibold text-gray-400">豆种:</span> ${bean.variety}</p>
+                            <p><span class="font-semibold text-gray-400">烘焙商:</span> ${bean.roaster}</p>
+                            <p><span class="font-semibold text-gray-400">处理法:</span> ${bean.process}</p>
+                            <p><span class="font-semibold text-gray-400">风味:</span> ${flavorHtml}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        function renderContent(filterBy) {
+            const container = document.getElementById('content-container');
+            container.innerHTML = '';
+            
+            let groupedData = {};
+
+            if (filterBy === 'flavor') {
+                const flavorGroups = {
+                    '水果风味': ['橙', '柠檬', '草莓', '西瓜', '蜜桃', '黑樱桃', '莲雾', '树莓', '杨桃', '凤梨', '菠萝蜜', '李子', '西梅', '葡萄', '黑布林', '百香果', '杏', '芒果'],
+                    '坚果/巧克力风味': ['巧克力', '可可'],
+                    '茶/草本风味': ['红茶', '花茶', '甜菊'],
+                    '甜味/其他': ['红糖', '蔗糖', '甘蔗', '干柿子', '余韵回甘', '泡泡糖', '红枣', '朗姆酒', '葡萄酒', '肉桂', '玫瑰']
+                };
+
+                for (const group in flavorGroups) {
+                    groupedData[group] = [];
+                }
+
+                coffeeBeans.forEach(bean => {
+                    for (const group in flavorGroups) {
+                        const hasFlavor = flavorGroups[group].some(flavor => bean.flavor.includes(flavor));
+                        if (hasFlavor) {
+                            groupedData[group].push(bean);
+                        }
+                    }
+                });
+
+                for (const group in groupedData) {
+                    if (groupedData[group].length > 0) {
+                        const groupTitle = document.createElement('h2');
+                        groupTitle.className = 'text-2xl font-bold mt-8 mb-4 border-b-2 border-gray-700 pb-2';
+                        groupTitle.textContent = group;
+                        container.appendChild(groupTitle);
+
+                        const groupGrid = document.createElement('div');
+                        groupGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                        groupedData[group].forEach(bean => {
+                            groupGrid.innerHTML += createCard(bean);
+                        });
+                        container.appendChild(groupGrid);
+                    }
+                }
+
+            } else {
+                coffeeBeans.forEach(bean => {
+                    const key = bean[filterBy === 'country' ? 'country_cn' : filterBy];
+                    if (!groupedData[key]) {
+                        groupedData[key] = [];
+                    }
+                    groupedData[key].push(bean);
+                });
+
+                for (const key in groupedData) {
+                    const groupTitle = document.createElement('h2');
+                    groupTitle.className = 'text-2xl font-bold mt-8 mb-4 border-b-2 border-gray-700 pb-2';
+                    const flag = countryFlags[key] || '';
+                    groupTitle.textContent = `${key} ${flag}`;
+                    container.appendChild(groupTitle);
+
+                    const groupGrid = document.createElement('div');
+                    groupGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                    groupedData[key].forEach(bean => {
+                        groupGrid.innerHTML += createCard(bean);
+                    });
+                    container.appendChild(groupGrid);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.filter-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const filter = e.target.dataset.filter;
+                    renderContent(filter);
+                });
+            });
+            // Initial render
+            renderContent('country');
+        });
+    </script>
+</body>
+</html>
