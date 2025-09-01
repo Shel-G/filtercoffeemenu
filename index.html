@@ -104,47 +104,44 @@
     background: transparent;
     border: none;
   }
+  .roaster-marker-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    transform-origin: left center;
+  }
+  .roaster-marker-container:hover {
+      transform: scale(1.1);
+  }
   .roaster-dot-marker {
     background-color: var(--accent);
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     border: 3px solid rgba(247, 201, 110, 0.5);
     box-shadow: 0 0 10px var(--accent);
-    cursor: pointer;
     animation: pulse 2s infinite;
+    flex-shrink: 0;
   }
-  @keyframes pulse {
-    0% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(247, 201, 110, 0.7);
-    }
-    70% {
-        transform: scale(1);
-        box-shadow: 0 0 0 10px rgba(247, 201, 110, 0);
-    }
-    100% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(247, 201, 110, 0);
-    }
-  }
-  .leaflet-popup-content-wrapper {
-    background: var(--bg1);
-    color: var(--ink);
+   .roaster-name-label {
+    background-color: rgba(15, 10, 6, 0.85);
+    backdrop-filter: blur(4px);
+    color: var(--accent);
+    padding: 4px 8px;
+    border-radius: 5px;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-  }
-  .leaflet-popup-content {
-    margin: 10px;
+    font-size: 12px;
     font-weight: 600;
-    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
   }
-  .leaflet-popup-tip {
-    background: var(--bg1);
-  }
-  .leaflet-popup-close-button {
-    color: var(--sub) !important;
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(247, 201, 110, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(247, 201, 110, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(247, 201, 110, 0); }
   }
 
   /* --- Detail Panel Styles --- */
@@ -166,13 +163,12 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 75vh; /* Set a fixed height */
+      height: 75vh;
       background: linear-gradient(135deg, var(--bg2), var(--bg1));
       border-top: 1px solid var(--border);
       border-radius: 20px 20px 0 0;
       z-index: 1001;
       transform: translateY(100%);
-      /* UPDATED: Faster, snappier transition */
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       padding: 2rem;
       overflow-y: auto;
@@ -191,12 +187,10 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 2rem;
-      /* NEW: Base state for content animation */
       opacity: 0;
       transform: translateY(15px);
       transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
   }
-  /* NEW: Visible state for content animation */
   .detail-panel-overlay.is-visible .detail-content {
       opacity: 1;
       transform: translateY(0);
@@ -206,13 +200,37 @@
   }
   .detail-fig {
     position: relative;
+    min-height: 250px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
+  .detail-fig.is-loading::after {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    position: absolute;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
   .detail-fig img {
       width: 100%;
       height: auto;
       border-radius: 12px;
       object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.4s ease;
   }
+  .detail-fig img.is-loaded {
+      opacity: 1;
+  }
+
   .detail-body .title {
       font-size: 2rem;
       margin: 0 0 .5rem;
@@ -325,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     { "NO": 5, "国家": "泰国", "产区": "Tak", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Chang Pao, Le Tor Gold", "烘焙商": "Lot of Taste", "处理法": "日晒", "海拔": null, "风味描述": "李子、蔗糖、黑葡萄干、余韵回甘" },
     { "NO": 6, "国家": "泰国", "产区": "Tak", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Chang Pao, Le Tor Gold", "烘焙商": "Lot of Taste", "处理法": "日晒", "海拔": null, "风味描述": "玫瑰、树莓、西柚、葡萄酒、余韵回甘" },
     { "NO": 7, "国家": "泰国", "产区": "Maejan Tai, Chiang Rai", "豆种": "Catimor, Mix", "庄园/生产者": "Liger", "烘焙商": "Akha Ama Phrasingh", "处理法": "日晒", "海拔": "1400 masl", "风味描述": "菠萝、西瓜、杨桃" },
-    { "NO": 8, "国家": "泰国", "产区": "Mae chaem, Chiang Mai", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Mae Jam", "烘焙商": "Graph Coffee Co.", "处理法": "传统水洗", "海拔": null, "风味描述": "红茶、红糖、凤梨、菠萝蜜" },
+    // DATA FIX: Changed roaster for bean #8
+    { "NO": 8, "国家": "泰国", "产区": "Mae chaem, Chiang Mai", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Mae Jam", "烘焙商": "Akha Ama Phrasingh", "处理法": "传统水洗", "海拔": null, "风味描述": "红茶、红糖、凤梨、菠萝蜜" },
     { "NO": 9, "国家": "泰国", "产区": "Doi Chang, Chiang Rai", "豆种": "Typica, Catimor, Mix", "庄园/生产者": "Apiwat", "烘焙商": "Akha Ama Phrasingh", "处理法": "水洗", "海拔": "1200-1395 masl", "风味描述": "巧克力布朗尼、葡萄干、肉桂、热红酒、百香果" },
     { "NO": 10, "国家": "秘鲁", "产区": null, "豆种": "Gesha", "庄园/生产者": "Lorenzo Arbildo", "烘焙商": "Fluid", "处理法": "水洗", "海拔": null, "风味描述": "草莓、罐头桃、花茶" },
     { "NO": 11, "国家": "印度尼西亚", "产区": "Kintamani, Bali", "豆种": "USDA, Cobra, Kopyol", "庄园/生产者": "Nismara Singaraja", "烘焙商": "Tiong Hoe Specialty Coffee", "处理法": "传统水洗", "海拔": null, "风味描述": "红糖、甘蔗、干柿子" },
@@ -348,31 +367,23 @@ document.addEventListener('DOMContentLoaded', () => {
     "Tiong Hoe Specialty Coffee": { country: "新加坡", city: "新加坡", lat: 1.2995, lng: 103.8378 },
   };
   
-  // Pre-process beans: group by roaster
   const beansByRoaster = beansData.reduce((acc, bean) => {
     const roasterName = bean.烘焙商;
-    if (!acc[roasterName]) {
-      acc[roasterName] = [];
-    }
+    if (!acc[roasterName]) { acc[roasterName] = []; }
     acc[roasterName].push(bean);
     return acc;
   }, {});
 
-
-  // --- UI Elements ---
   const mapElement = document.getElementById('map');
   const countryChips = document.getElementById('country-chips');
   const detailOverlay = document.getElementById('detail-panel-overlay');
   const detailContent = document.getElementById('detail-content');
   const closeBtn = document.getElementById('close-btn');
   
-  // --- State ---
   let currentCountryFilter = 'all';
   let currentRoasterBeans = [];
   let currentBeanIndex = 0;
 
-
-  // --- MAP INITIALIZATION (Leaflet) ---
   const map = L.map(mapElement, { scrollWheelZoom: false }).setView([8, 105], 4);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -383,13 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderBeanInPanel(bean) {
     const flavorTags = bean.风味描述.split('、').map(flavor => `<span class="flavor-tag">${flavor}</span>`).join('');
-    
-    // Check if navigation is needed
     const showNav = currentRoasterBeans.length > 1;
 
     detailContent.innerHTML = `
-      <div class="detail-fig">
-          <img src="https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/main/${bean.NO}.png" alt="${bean.产区}">
+      <div class="detail-fig is-loading">
+          <img data-src="https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/main/${bean.NO}.png" alt="${bean.产区}">
           <div class="nav-arrow left ${showNav ? 'visible' : ''}" id="nav-prev">&lt;</div>
           <div class="nav-arrow right ${showNav ? 'visible' : ''}" id="nav-next">&gt;</div>
       </div>
@@ -405,7 +414,18 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    // Add event listeners for nav arrows if they exist
+    const figElement = detailContent.querySelector('.detail-fig');
+    const imgElement = figElement.querySelector('img');
+    
+    imgElement.onload = () => {
+        figElement.classList.remove('is-loading');
+        imgElement.classList.add('is-loaded');
+    };
+    imgElement.onerror = () => {
+        figElement.classList.remove('is-loading');
+    };
+    imgElement.src = imgElement.dataset.src;
+
     if(showNav) {
         document.getElementById('nav-prev').addEventListener('click', () => {
             currentBeanIndex = (currentBeanIndex - 1 + currentRoasterBeans.length) % currentRoasterBeans.length;
@@ -437,27 +457,24 @@ document.addEventListener('DOMContentLoaded', () => {
       
       Object.entries(roasterInfo).forEach(([roasterName, info]) => {
           if (currentCountryFilter !== 'all' && info.country !== currentCountryFilter) {
-              return; // Skip if not in the filtered country
+              return;
           }
 
           if (info.lat && info.lng) {
               const icon = L.divIcon({
-                  className: 'roaster-dot-marker-container',
-                  html: `<div class="roaster-dot-marker"></div>`,
-                  iconSize: [22, 22],
-                  iconAnchor: [11, 11]
+                  className: 'leaflet-div-icon',
+                  html: `<div class="roaster-marker-container">
+                           <div class="roaster-dot-marker"></div>
+                           <div class="roaster-name-label">${roasterName}</div>
+                         </div>`,
+                  iconSize: null,
+                  iconAnchor: [6, 6]
               });
 
               const marker = L.marker([info.lat, info.lng], { icon: icon }).addTo(markers);
               
-              marker.bindPopup(`<b>${roasterName}</b>`);
-
               marker.on('click', () => {
-                marker.openPopup();
-                // UPDATED: Shortened delay
-                setTimeout(() => {
-                    showDetailPanel(roasterName);
-                }, 150);
+                showDetailPanel(roasterName);
               });
               bounds.extend([info.lat, info.lng]);
           }
@@ -470,7 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   }
   
-  // --- EVENT LISTENERS ---
   countryChips.addEventListener('click', (e) => {
     if (e.target.tagName === 'BUTTON') {
       countryChips.querySelector('.active').classList.remove('active');
@@ -487,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   });
 
-  // --- INITIAL LOAD ---
   renderMarkers();
 });
 </script>
