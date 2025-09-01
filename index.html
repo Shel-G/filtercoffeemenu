@@ -1,200 +1,496 @@
-# Create a synced interactive demo where map clicks & filter chips update the card carousel.
-# - Uses Leaflet (OSM tiles) + Swiper
-# - Image URLs pulled from user's GitHub via getImageUrl(id)
-# - Robust re-render: destroy & recreate Swiper when filter changes
-# - Fit map to selected country's markers; scroll viewport to cards on interaction
-
-from pathlib import Path
-
-html = r"""<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SEA Cupping · 互动地图 + 同步卡片</title>
-<meta name="description" content="Southeast Asia coffee cupping: interactive map synced with card carousel">
-<link rel="preconnect" href="https://unpkg.com">
+<title>SEA Cupping Lineup • 互动地图 + 同步卡片</title>
+<meta name="description" content="一个根据烘焙商国家进行筛选的互动咖啡豆地图。">
+
+<!-- External Libraries -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/swiper@10/swiper-bundle.min.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
 <style>
-  :root{
-    --bg:#0f1216; --panel:#141a22; --ink:#e8eef6; --sub:#b6c2d0; --accent:#7fd1ae; --border:#213044;
+  :root {
+    --bg1: #0f0a06;
+    --bg2: #2a1b12;
+    --panel: rgba(17, 20, 24, 0.7);
+    --ink: #f2efe9;
+    --sub: #d0c6bb;
+    --accent: #f7c96e;
+    --border: rgba(247, 201, 110, 0.2);
   }
-  *{box-sizing:border-box}
-  html,body{height:100%; margin:0}
-  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-  .wrap{width:min(1180px,94vw); margin:14px auto; display:grid; gap:12px}
-  header{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap}
-  h1{font-size:clamp(22px,3vw,32px); margin:0}
-  .chips{display:flex; gap:8px; flex-wrap:wrap}
-  .chip{background:rgba(255,255,255,.06); border:1px solid var(--border); color:#fff; border-radius:999px; padding:8px 12px; cursor:pointer; font-weight:700}
-  .chip.active{background:linear-gradient(135deg,var(--accent),#57b894); color:#0c1116; border:none}
-  .panel{background:var(--panel); border:1px solid var(--border); border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,.35)}
-  #map{height:380px; border-radius:16px}
-  .grid{display:grid; grid-template-columns:1fr}
-  .swiper{width:100%; padding:12px}
-  .swiper-slide{display:flex; justify-content:center}
-  .card{width:min(860px,100%); background:#0c1015; border:1px solid var(--border); border-radius:16px; overflow:hidden}
-  .fig{height:360px; background:#0a0e12; display:grid; place-items:center}
-  .fig img{width:100%; height:100%; object-fit:cover}
-  .body{padding:14px 16px 16px}
-  .title{margin:0 0 6px; font-size:20px}
-  .meta{color:var(--sub); font-size:14px; margin:0; padding:0; list-style:none}
-  .meta li{margin:4px 0}
-  footer{color:var(--sub); text-align:center; padding:12px 0 22px}
-  .hint{color:var(--sub); font-size:14px; margin:2px 0 8px}
+  * { box-sizing: border-box; }
+  html, body { 
+    height: 100%; 
+    margin: 0;
+    overflow: hidden; /* Prevent body scroll when detail panel is open */
+  }
+  body {
+    font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(1200px 800px at 15% 10%, rgba(247, 201, 110, 0.1), transparent 60%),
+                radial-gradient(900px 700px at 85% 90%, rgba(247, 201, 110, 0.08), transparent 60%),
+                linear-gradient(135deg, var(--bg1), var(--bg2));
+    color: var(--ink);
+  }
+  .wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+  }
+  header {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    flex-shrink: 0;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin: 0 0 1rem;
+    color: var(--ink);
+    font-weight: 800;
+  }
+  .intro-hint {
+    font-size: 0.9rem;
+    color: var(--sub);
+    max-width: 600px;
+    margin: -0.5rem auto 1.5rem;
+    line-height: 1.6;
+  }
+  .filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: .75rem;
+  }
+  .chip {
+    background: rgba(0, 0, 0, .2);
+    border: 1px solid var(--border);
+    color: var(--sub);
+    border-radius: 999px;
+    padding: .6rem 1.2rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all .2s ease;
+  }
+  .chip:hover {
+      background-color: rgba(0,0,0,.4);
+      color: var(--ink);
+  }
+  .chip.active {
+    background: var(--accent);
+    color: var(--bg1);
+    border-color: var(--accent);
+    transform: scale(1.05);
+  }
+  #map-container {
+      flex-grow: 1;
+      position: relative;
+  }
+  #map {
+    height: 100%;
+    width: 100%;
+    border-radius: 16px;
+    background-color: var(--bg1);
+    border: 1px solid var(--border);
+  }
+
+  /* --- Custom Map Marker & Popup Styles --- */
+  .leaflet-div-icon {
+    background: transparent;
+    border: none;
+  }
+  .roaster-dot-marker {
+    background-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid rgba(247, 201, 110, 0.5);
+    box-shadow: 0 0 10px var(--accent);
+    cursor: pointer;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(247, 201, 110, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(247, 201, 110, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(247, 201, 110, 0);
+    }
+  }
+  .leaflet-popup-content-wrapper {
+    background: var(--bg1);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+  }
+  .leaflet-popup-content {
+    margin: 10px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .leaflet-popup-tip {
+    background: var(--bg1);
+  }
+  .leaflet-popup-close-button {
+    color: var(--sub) !important;
+  }
+
+  /* --- Detail Panel Styles --- */
+  .detail-panel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  .detail-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 75vh; /* Set a fixed height */
+      background: linear-gradient(135deg, var(--bg2), var(--bg1));
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      z-index: 1001;
+      transform: translateY(100%);
+      /* UPDATED: Faster, snappier transition */
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      padding: 2rem;
+      overflow-y: auto;
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+  }
+   .detail-panel-overlay.is-visible {
+      opacity: 1;
+      visibility: visible;
+  }
+  .detail-panel-overlay.is-visible .detail-panel {
+      transform: translateY(0);
+  }
+  .detail-content {
+      max-width: 800px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      /* NEW: Base state for content animation */
+      opacity: 0;
+      transform: translateY(15px);
+      transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+  }
+  /* NEW: Visible state for content animation */
+  .detail-panel-overlay.is-visible .detail-content {
+      opacity: 1;
+      transform: translateY(0);
+  }
+  @media(min-width: 768px){
+      .detail-content { grid-template-columns: 300px 1fr; }
+  }
+  .detail-fig {
+    position: relative;
+  }
+  .detail-fig img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      object-fit: cover;
+  }
+  .detail-body .title {
+      font-size: 2rem;
+      margin: 0 0 .5rem;
+      font-weight: 800;
+      color: var(--accent);
+  }
+  .detail-body .meta {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      color: var(--sub);
+      line-height: 1.8;
+  }
+  .detail-body .meta strong {
+    color: var(--ink);
+    font-weight: 600;
+    min-width: 80px;
+    display: inline-block;
+  }
+  .detail-body .flavors {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+  }
+  .flavor-tag {
+    background-color: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+  }
+  .close-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      background: none;
+      border: none;
+      color: var(--sub);
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      z-index: 20;
+  }
+  .nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.5);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+    z-index: 10;
+  }
+  .nav-arrow.visible {
+      display: flex;
+  }
+  .nav-arrow:hover {
+      background: rgba(0,0,0,0.8);
+  }
+  .nav-arrow.left { left: 10px; }
+  .nav-arrow.right { right: 10px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>SEA Cupping • 互动地图 + 同步卡片</h1>
-    <div class="chips" id="chips">
-      <button class="chip active" data-filter="">全部</button>
-      <button class="chip" data-filter="新加坡 🇸🇬">新加坡 🇸🇬</button>
-      <button class="chip" data-filter="马来西亚 🇲🇾">马来西亚 🇲🇾</button>
-      <button class="chip" data-filter="泰国 🇹🇭">泰国 🇹🇭</button>
+    <h1>SEA Cupping Lineup • 互动地图 + 同步卡片</h1>
+    <p class="intro-hint">点击上方按烘焙商所在国家筛选，点击地图上烘焙商的地理位置标记，会自动展示此次杯测该烘焙商对应的豆子卡片信息。</p>
+    <div class="filter-group" id="country-chips">
+      <button class="chip active" data-filter="all">全部国家</button>
+      <button class="chip" data-filter="马来西亚">马来西亚 🇲🇾</button>
+      <button class="chip" data-filter="泰国">泰国 🇹🇭</button>
+      <button class="chip" data-filter="新加坡">新加坡 🇸🇬</button>
     </div>
   </header>
+  <main id="map-container">
+    <div id="map"></div>
+  </main>
+</div>
 
-  <div class="hint">点击地图上的标记，或点击上方国家筛选，下面的卡片会自动切换到对应国家。</div>
-
-  <section id="map" class="panel"></section>
-
-  <section id="cards" class="panel grid">
-    <div class="swiper">
-      <div class="swiper-wrapper" id="slides"></div>
-      <div class="swiper-pagination"></div>
-      <div class="swiper-button-prev"></div>
-      <div class="swiper-button-next"></div>
+<div class="detail-panel-overlay" id="detail-panel-overlay">
+  <div class="detail-panel">
+    <button class="close-btn" id="close-btn">&times;</button>
+    <div class="detail-content" id="detail-content">
+      <!-- Detailed bean info will be injected here -->
     </div>
-  </section>
-
-  <footer>© 2025 · SEA Cupping · 同步交互 Demo — 将数据替换为你的 14 款豆子</footer>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/swiper@10/swiper-bundle.min.js"></script>
 <script>
-// ===== Images on GitHub =====
-const getImageUrl = (id) => 
-  `https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/main/${id}.png`;
+document.addEventListener('DOMContentLoaded', () => {
 
-// ===== Data =====
-const BEANS = [
-  // Singapore
-  {id:'sg-nylon', country:'新加坡 🇸🇬', city:'Singapore', roaster:'Nylon Coffee Roasters', title:'House Blend / Single Origin', process:'Washed / Natural', variety:['Bourbon','Typica'], flavors:['柑橘','可可','坚果'], image:getImageUrl('sg-nylon'), lat:1.2966, lng:103.8485},
-  {id:'sg-fluid', country:'新加坡 🇸🇬', city:'Singapore', roaster:'Fluid', title:'Peru Gesha', process:'Washed', variety:['Gesha'], flavors:['草莓','桃子','花茶'], image:getImageUrl('sg-fluid'), lat:1.3005, lng:103.8597},
-  // Malaysia
-  {id:'my-vcr', country:'马来西亚 🇲🇾', city:'Kuala Lumpur', roaster:'VCR Coffee Roasters', title:'Anaerobic Process', process:'Anaerobic', variety:['-'], flavors:['百香果','黄葡萄干','杏'], image:getImageUrl('my-vcr'), lat:3.1390, lng:101.6869},
-  {id:'my-artisan', country:'马来西亚 🇲🇾', city:'Kuala Lumpur', roaster:'Artisan Roast TTDI', title:'Ethiopia Gomoro Guji G1', process:'—', variety:['—'], flavors:['橙汁','芒果','柠檬糖果'], image:getImageUrl('my-artisan'), lat:3.1402, lng:101.6211},
-  // Thailand
-  {id:'th-graph', country:'泰国 🇹🇭', city:'Chiang Mai', roaster:'Graph Coffee Co.', title:'Mae Chaem · Filter', process:'传统水洗', variety:['Catimor','Catuai','Typica'], flavors:['红茶','红糖','凤梨','菠萝蜜'], image:getImageUrl('th-graph'), lat:18.7883, lng:98.9853},
-  {id:'th-akha', country:'泰国 🇹🇭', city:'Chiang Rai', roaster:'Akha Ama Phrasingh', title:'Doi Chang · Washed', process:'水洗', variety:['Typica','Catimor','Mix'], flavors:['莲雾','西瓜','杨桃'], image:getImageUrl('th-akha'), lat:19.9072, lng:99.8309},
-  {id:'th-lot', country:'泰国 🇹🇭', city:'Tak', roaster:'Lot of Taste', title:'Le Tor Gold · Natural', process:'日晒', variety:['Catimor','Catuai','Typica'], flavors:['玫瑰','树莓','西梅','葡萄酒','回甘'], image:getImageUrl('th-lot'), lat:16.8785, lng:99.1256},
-];
+  const beansData = [
+    { "NO": 1, "国家": "马来西亚", "产区": "Johor", "豆种": "Peaberry", "庄园/生产者": "My Liberica, Jason Liew", "烘焙商": "One Half", "处理法": "JH 日晒 12天", "海拔": "26-30 masl", "风味描述": "甜菊、龙眼、红毛丹、莲心果、莎士" },
+    { "NO": 2, "国家": "马来西亚", "产区": "Johor N26 Lot 1", "豆种": "Liberaca", "庄园/生产者": "My Liberica", "烘焙商": "Cloud Catcher Coffee", "处理法": "厌氧日晒 26天", "海拔": "0-20m", "风味描述": "黑樱桃、泡泡糖、红枣、甜菊" },
+    { "NO": 3, "国家": "萨尔瓦多", "产区": "Santa Ana", "豆种": "Bourbon", "庄园/生产者": "El Martillo", "烘焙商": "VCR Coffee Roasters", "处理法": "厌氧日晒", "海拔": "1650-1700 masl", "风味描述": "百香果、黄葡萄干、杏" },
+    { "NO": 4, "国家": "泰国", "产区": "Chiang Rai", "豆种": "Catuai, Typica", "庄园/生产者": "Hua Chang Nawin Yaesonkco", "烘焙商": "Curate Coffee Roasters", "处理法": "日晒转酵母发酵", "海拔": null, "风味描述": "朗姆酒、红樱桃、巧克力" },
+    { "NO": 5, "国家": "泰国", "产区": "Tak", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Chang Pao, Le Tor Gold", "烘焙商": "Lot of Taste", "处理法": "日晒", "海拔": null, "风味描述": "李子、蔗糖、黑葡萄干、余韵回甘" },
+    { "NO": 6, "国家": "泰国", "产区": "Tak", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Chang Pao, Le Tor Gold", "烘焙商": "Lot of Taste", "处理法": "日晒", "海拔": null, "风味描述": "玫瑰、树莓、西柚、葡萄酒、余韵回甘" },
+    { "NO": 7, "国家": "泰国", "产区": "Maejan Tai, Chiang Rai", "豆种": "Catimor, Mix", "庄园/生产者": "Liger", "烘焙商": "Akha Ama Phrasingh", "处理法": "日晒", "海拔": "1400 masl", "风味描述": "菠萝、西瓜、杨桃" },
+    { "NO": 8, "国家": "泰国", "产区": "Mae chaem, Chiang Mai", "豆种": "Catimor, Catuai, Typica", "庄园/生产者": "Mae Jam", "烘焙商": "Graph Coffee Co.", "处理法": "传统水洗", "海拔": null, "风味描述": "红茶、红糖、凤梨、菠萝蜜" },
+    { "NO": 9, "国家": "泰国", "产区": "Doi Chang, Chiang Rai", "豆种": "Typica, Catimor, Mix", "庄园/生产者": "Apiwat", "烘焙商": "Akha Ama Phrasingh", "处理法": "水洗", "海拔": "1200-1395 masl", "风味描述": "巧克力布朗尼、葡萄干、肉桂、热红酒、百香果" },
+    { "NO": 10, "国家": "秘鲁", "产区": null, "豆种": "Gesha", "庄园/生产者": "Lorenzo Arbildo", "烘焙商": "Fluid", "处理法": "水洗", "海拔": null, "风味描述": "草莓、罐头桃、花茶" },
+    { "NO": 11, "国家": "印度尼西亚", "产区": "Kintamani, Bali", "豆种": "USDA, Cobra, Kopyol", "庄园/生产者": "Nismara Singaraja", "烘焙商": "Tiong Hoe Specialty Coffee", "处理法": "传统水洗", "海拔": null, "风味描述": "红糖、甘蔗、干柿子" },
+    { "NO": 12, "国家": "尼加拉瓜", "产区": "Jinotega", "豆种": "Catuai, Parainema", "庄园/生产者": "Ramon Blandino", "烘焙商": "Cloud Catcher Coffee", "处理法": "水洗", "海拔": "1600m", "风味描述": "莲雾、木槿花、蜜桃、橙" },
+    { "NO": 13, "国家": "埃塞俄比亚", "产区": "Gomoro Guji G1", "豆种": null, "庄园/生产者": null, "烘焙商": "Artisan Roast Coffee", "处理法": null, "海拔": null, "风味描述": "橙汁、芒果、柠檬味硬糖" },
+    { "NO": 14, "国家": "坦桑尼亚", "产区": null, "豆种": "Bourbon (N39)", "庄园/生产者": "Various Smallholder Producers", "烘焙商": "Nylon Coffee Roasters", "处理法": "水洗", "海拔": null, "风味描述": "干浆果、黑布林、黑葡萄" }
+  ];
 
-// ===== Map =====
-const map = L.map('map', {scrollWheelZoom:false}).setView([8.1, 105.0], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '&copy; OpenStreetMap'}).addTo(map);
+  const roasterInfo = {
+    "Akha Ama Phrasingh": { country: "泰国", city: "清迈", lat: 18.7883, lng: 98.9853 },
+    "Graph Coffee Co.": { country: "泰国", city: "清迈", lat: 18.7946, lng: 98.9840 },
+    "Lot of Taste": { country: "泰国", city: "清迈", lat: 18.7811, lng: 99.0002 },
+    "Artisan Roast Coffee": { country: "马来西亚", city: "吉隆坡", lat: 3.1390, lng: 101.6869 },
+    "Cloud Catcher Coffee": { country: "马来西亚", city: "吉隆坡", lat: 3.1450, lng: 101.7124 },
+    "Curate Coffee Roasters": { country: "马来西亚", city: "吉隆坡", lat: 3.1550, lng: 101.7100 },
+    "One Half": { country: "马来西亚", city: "吉隆坡", lat: 3.1412, lng: 101.6951 },
+    "VCR Coffee Roasters": { country: "马来西亚", city: "吉隆坡", lat: 3.1436, lng: 101.7088 },
+    "Fluid": { country: "新加坡", city: "新加坡", lat: 1.2839, lng: 103.8465 },
+    "Nylon Coffee Roasters": { country: "新加坡", city: "新加坡", lat: 1.2820, lng: 103.8447 },
+    "Tiong Hoe Specialty Coffee": { country: "新加坡", city: "新加坡", lat: 1.2995, lng: 103.8378 },
+  };
+  
+  // Pre-process beans: group by roaster
+  const beansByRoaster = beansData.reduce((acc, bean) => {
+    const roasterName = bean.烘焙商;
+    if (!acc[roasterName]) {
+      acc[roasterName] = [];
+    }
+    acc[roasterName].push(bean);
+    return acc;
+  }, {});
 
-const markers = [];
-const countryToBounds = {};
-BEANS.forEach((b) => {
-  const m = L.marker([b.lat, b.lng]).addTo(map).bindPopup(`<strong>${b.roaster}</strong><br>${b.city} · ${b.country}<br>${b.title}`);
-  m.on('click', () => {
-    focusCountry(b.country, {scroll:true});
-  });
-  markers.push(m);
-  // collect bounds per country
-  if(!countryToBounds[b.country]) countryToBounds[b.country] = L.latLngBounds();
-  countryToBounds[b.country].extend([b.lat, b.lng]);
-});
 
-// build overall bounds
-const allBounds = L.latLngBounds(BEANS.map(b => [b.lat, b.lng]));
-if (allBounds.isValid()) map.fitBounds(allBounds.pad(0.2));
+  // --- UI Elements ---
+  const mapElement = document.getElementById('map');
+  const countryChips = document.getElementById('country-chips');
+  const detailOverlay = document.getElementById('detail-panel-overlay');
+  const detailContent = document.getElementById('detail-content');
+  const closeBtn = document.getElementById('close-btn');
+  
+  // --- State ---
+  let currentCountryFilter = 'all';
+  let currentRoasterBeans = [];
+  let currentBeanIndex = 0;
 
-// ===== Swiper render / sync =====
-let swiper = null;
-const slidesEl = document.getElementById('slides');
-const cardsSection = document.getElementById('cards');
-let currentFilter = '';
 
-function renderSlides(list){
-  slidesEl.innerHTML = list.map(b => `
-    <div class="swiper-slide">
-      <article class="card">
-        <div class="fig"><img src="${b.image}" alt="${b.title}"></div>
-        <div class="body">
-          <h3 class="title">${b.roaster} — ${b.title}</h3>
+  // --- MAP INITIALIZATION (Leaflet) ---
+  const map = L.map(mapElement, { scrollWheelZoom: false }).setView([8, 105], 4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 18
+  }).addTo(map);
+
+  const markers = L.layerGroup().addTo(map);
+
+  function renderBeanInPanel(bean) {
+    const flavorTags = bean.风味描述.split('、').map(flavor => `<span class="flavor-tag">${flavor}</span>`).join('');
+    
+    // Check if navigation is needed
+    const showNav = currentRoasterBeans.length > 1;
+
+    detailContent.innerHTML = `
+      <div class="detail-fig">
+          <img src="https://raw.githubusercontent.com/Shel-G/filtercoffeemenu/main/${bean.NO}.png" alt="${bean.产区}">
+          <div class="nav-arrow left ${showNav ? 'visible' : ''}" id="nav-prev">&lt;</div>
+          <div class="nav-arrow right ${showNav ? 'visible' : ''}" id="nav-next">&gt;</div>
+      </div>
+      <div class="detail-body">
+          <h2 class="title">${bean.烘焙商} (#${bean.NO})</h2>
           <ul class="meta">
-            <li>国家：${b.country}｜城市：${b.city}</li>
-            <li>处理法：${b.process}</li>
-            <li>豆种：${b.variety.join(', ')}</li>
-            <li>风味：${b.flavors.join('，')}</li>
+              <li><strong>产区:</strong> ${bean.产区 || bean.国家}</li>
+              <li><strong>豆种:</strong> ${bean.豆种 || 'N/A'}</li>
+              <li><strong>处理法:</strong> ${bean.处理法 || 'N/A'}</li>
+              <li><strong>生产者:</strong> ${bean['庄园/生产者'] || 'N/A'}</li>
           </ul>
-        </div>
-      </article>
-    </div>`).join('');
-}
+          <div class="flavors">${flavorTags}</div>
+      </div>
+    `;
 
-function createSwiper(){
-  // destroy existing instance first (important when re-rendering)
-  if (swiper) { swiper.destroy(true, true); swiper = null; }
-  swiper = new Swiper('.swiper', {
-    slidesPerView: 1,
-    spaceBetween: 12,
-    loop: false,
-    pagination: { el: '.swiper-pagination', clickable: true },
-    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-  });
-}
-
-function setChipsActive(country){
-  document.querySelectorAll('.chip').forEach(c => {
-    c.classList.toggle('active', (c.dataset.filter||'') === (country||''));
-  });
-}
-
-function focusCountry(country, opts={scroll:false}){
-  currentFilter = country || '';
-  const list = currentFilter ? BEANS.filter(b => b.country === currentFilter) : BEANS;
-  renderSlides(list);
-  createSwiper();
-  if (list.length) swiper.slideTo(0);
-  setChipsActive(currentFilter);
-
-  // Fit map to selection
-  if (currentFilter && countryToBounds[currentFilter]) {
-    map.fitBounds(countryToBounds[currentFilter].pad(0.2));
-  } else {
-    map.fitBounds(allBounds.pad(0.2));
+    // Add event listeners for nav arrows if they exist
+    if(showNav) {
+        document.getElementById('nav-prev').addEventListener('click', () => {
+            currentBeanIndex = (currentBeanIndex - 1 + currentRoasterBeans.length) % currentRoasterBeans.length;
+            renderBeanInPanel(currentRoasterBeans[currentBeanIndex]);
+        });
+        document.getElementById('nav-next').addEventListener('click', () => {
+            currentBeanIndex = (currentBeanIndex + 1) % currentRoasterBeans.length;
+            renderBeanInPanel(currentRoasterBeans[currentBeanIndex]);
+        });
+    }
   }
 
-  // Optional: scroll to cards for visibility on mobile
-  if (opts.scroll) {
-    cardsSection.scrollIntoView({behavior:'smooth', block:'start'});
+  function showDetailPanel(roasterName) {
+      currentRoasterBeans = beansByRoaster[roasterName] || [];
+      if (currentRoasterBeans.length === 0) return;
+      
+      currentBeanIndex = 0;
+      renderBeanInPanel(currentRoasterBeans[currentBeanIndex]);
+      detailOverlay.classList.add('is-visible');
   }
-}
 
-// Initial render
-focusCountry('');
+  function hideDetailPanel() {
+      detailOverlay.classList.remove('is-visible');
+  }
 
-// Chip clicks
-document.getElementById('chips').addEventListener('click', (e) => {
-  const btn = e.target.closest('.chip');
-  if (!btn) return;
-  const c = btn.dataset.filter || '';
-  focusCountry(c, {scroll:true});
+  function renderMarkers() {
+      markers.clearLayers();
+      const bounds = L.latLngBounds();
+      
+      Object.entries(roasterInfo).forEach(([roasterName, info]) => {
+          if (currentCountryFilter !== 'all' && info.country !== currentCountryFilter) {
+              return; // Skip if not in the filtered country
+          }
+
+          if (info.lat && info.lng) {
+              const icon = L.divIcon({
+                  className: 'roaster-dot-marker-container',
+                  html: `<div class="roaster-dot-marker"></div>`,
+                  iconSize: [22, 22],
+                  iconAnchor: [11, 11]
+              });
+
+              const marker = L.marker([info.lat, info.lng], { icon: icon }).addTo(markers);
+              
+              marker.bindPopup(`<b>${roasterName}</b>`);
+
+              marker.on('click', () => {
+                marker.openPopup();
+                // UPDATED: Shortened delay
+                setTimeout(() => {
+                    showDetailPanel(roasterName);
+                }, 150);
+              });
+              bounds.extend([info.lat, info.lng]);
+          }
+      });
+
+      if (bounds.isValid()) {
+          map.fitBounds(bounds.pad(0.5));
+      } else {
+          map.setView([8, 105], 4);
+      }
+  }
+  
+  // --- EVENT LISTENERS ---
+  countryChips.addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') {
+      countryChips.querySelector('.active').classList.remove('active');
+      e.target.classList.add('active');
+      currentCountryFilter = e.target.dataset.filter;
+      renderMarkers();
+    }
+  });
+  
+  closeBtn.addEventListener('click', hideDetailPanel);
+  detailOverlay.addEventListener('click', (e) => {
+      if (e.target === detailOverlay) {
+          hideDetailPanel();
+      }
+  });
+
+  // --- INITIAL LOAD ---
+  renderMarkers();
 });
 </script>
 </body>
 </html>
-"""
-out = Path("/mnt/data/interactive-map-cards-sync.html")
-out.write_text(html, encoding="utf-8")
-out
+
