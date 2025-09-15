@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>标签看板 + 风味轮（联动筛选）</title>
+<title>标签看板 + 风味轮（联动筛选）· 规则增强 </title>
 <style>
-  :root{--bg:#0b0c10;--card:#12151b;--muted:#95a0ad;--fg:#e8edf2;--chip:#1c222c;--chip-a:#2b6cb0;--border:#232a33;--accent:#6aa9ff}
+  :root{--bg:#0b0c10;--card:#12151b;--muted:#95a0ad;--fg:#e8edf2;--chip:#1c222c;--chip-a:#2b6cb0;--border:#232a33;--accent:#6aa9ff;--hint:#9dd5ff}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
   .container{max-width:1200px;margin:36px auto;padding:0 16px}
   h1{margin:0 0 6px}
   .sub{color:var(--muted);margin-bottom:18px}
   .row{display:grid;grid-template-columns:1fr;gap:14px}
-  @media(min-width:1060px){.row{grid-template-columns:380px 1fr}}
+  @media(min-width:1100px){.row{grid-template-columns:360px 1fr}}
   .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-  .section{margin-bottom:10px}
+  .section{margin-bottom:12px}
   .section h3{margin:0 0 8px;font-size:13px;color:#cdd6df;text-transform:uppercase;letter-spacing:.04em}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{padding:6px 10px;border-radius:999px;background:var(--chip);border:1px solid #2a3140;color:#d7deea;cursor:pointer;user-select:none;transition:.15s}
@@ -34,16 +34,27 @@
   .title{font-weight:700}
   .meta{font-size:13px;color:#aeb6bf}
   .price{font-weight:700}
-  .wheel-wrap{display:flex;align-items:center;justify-content:center}
+
+  /* 风味轮容器强调样式 */
+  .wheel-panel{position:relative; overflow:hidden}
+  .wheel-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .wheel-hint{font-size:12px;color:var(--hint);background:rgba(106,169,255,.08);border:1px solid rgba(106,169,255,.25);padding:4px 8px;border-radius:999px}
+  .wheel-wrap{display:flex;align-items:center;justify-content:center;position:relative}
   .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;justify-content:center}
-  .leg{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #2a3140;border-radius:12px;background:#0f1520;font-size:12px}
+  .leg{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #2a3140;border-radius:12px;background:#0f1520;font-size:12px;transition:opacity .2s}
   .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+  /* 中心引导文案 + 呼吸圈 */
+  .center-cta{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+  .center-cta h4{margin:0;color:#0b0c10;font-size:14px;letter-spacing:.02em}
+  .pulse{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:230px;height:230px;border-radius:999px;border:2px solid rgba(255,255,255,.12);animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{0%{transform:translate(-50%,-50%) scale(0.94);opacity:.6}50%{transform:translate(-50%,-50%) scale(1);opacity:.15}100%{transform:translate(-50%,-50%) scale(0.94);opacity:.6}}
 </style>
 </head>
 <body>
   <div class="container">
-    <h1>标签看板 + 风味轮（联动筛选）</h1>
-    <div class="sub">全局仅支持 <b>价格排序</b>；左侧为标签看板（二级筛选），右侧含风味轮，二者与商品卡联动。</div>
+    <h1>标签看板 + 风味轮（联动筛选）· 强化可读性</h1>
+    <div class="sub">仅支持<b>价格排序</b>；处理法归 4 类；烘焙统一「中度烘焙」；产地统一到「庄园」；特色信息 Top 5；风味轮为两层同心圆，并在暗色背景上增加可读透明层与高亮交互，鼓励用风味轮筛选。</div>
 
     <div class="panel toolbar">
       <div class="muted">排序：</div>
@@ -64,21 +75,15 @@
           <div id="ingChips" class="chips"></div>
         </div>
         <div class="section">
-          <h3>处理方式</h3>
+          <h3>处理方式（4 类）</h3>
           <div id="procChips" class="chips"></div>
         </div>
         <div class="section">
-          <h3>产地来源（国家 / 产区 / 庄园）</h3>
-          <div class="chips" id="orgChips"></div>
-          <div class="chips" id="regChips" style="margin-top:6px"></div>
-          <div class="chips" id="estChips" style="margin-top:6px"></div>
+          <h3>产地：庄园</h3>
+          <div class="chips" id="estChips"></div>
         </div>
         <div class="section">
-          <h3>烘焙度</h3>
-          <div id="rstChips" class="chips"></div>
-        </div>
-        <div class="section">
-          <h3>特色信息</h3>
+          <h3>特色信息（Top 5）</h3>
           <div id="spcChips" class="chips"></div>
         </div>
       </aside>
@@ -90,14 +95,18 @@
           <div class="muted" id="stats"></div>
         </div>
 
-        <div class="panel" style="margin-bottom:12px">
-          <div class="section">
-            <h3>风味轮（点击/再次点击 = 选择/取消该风味家族）</h3>
-            <div class="wheel-wrap">
-              <svg id="flavorWheel" width="360" height="360" viewBox="0 0 360 360" role="img" aria-label="风味轮"></svg>
-            </div>
-            <div class="legend" id="wheelLegend"></div>
+        <div class="panel wheel-panel" style="margin-bottom:12px">
+          <div class="wheel-header">
+            <h3 style="margin:0">风味轮（内圈：家族；外圈：类别）</h3>
+            <span class="wheel-hint">提示：点击扇区进行筛选，再次点击取消；支持多选</span>
           </div>
+          <div class="wheel-wrap">
+            <!-- 透明底层：提升暗色背景可读性 -->
+            <svg id="flavorWheel" width="460" height="460" viewBox="0 0 460 460" role="img" aria-label="风味轮"></svg>
+            <div class="pulse" aria-hidden="true"></div>
+            <div class="center-cta"><h4>点选风味扇区筛选</h4></div>
+          </div>
+          <div class="legend" id="wheelLegend"></div>
         </div>
 
         <div id="grid" class="grid"></div>
@@ -107,7 +116,7 @@
 
 <script>
 // ======== 数据（示例：咖啡类） ========
-const items = [
+const items = [/* 复用之前示例数据（略） */
   { name_zh:"Finca SantaMaria 圣塔玛利亚庄园 Ghands", ingredient_type:["瑰夏"], processing_method:["日晒","厌氧发酵"], flavor_profile:["橙花","甜橙","杏桃","荔枝","莓果","混合水果糖"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["独家批次","24年BOP瑰夏日晒组第8名"], origin:"巴拿马", region:"奇里基", estate:"圣塔玛利亚庄园", roast_level:"中度烘焙" },
   { name_zh:"Elida Estate 艾力达庄园 VUELTA地块 EGN DRD 瑰夏暗房日晒", ingredient_type:["瑰夏"], processing_method:["日晒","暗房日晒"], flavor_profile:["玉兰花","橙汁","水蜜桃","葡萄","荔枝","蜂蜜"], category:"咖啡", price_unit:{ price:"158-168", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组冠军","24年BOP竞拍标王"], origin:"巴拿马", region:"波奎特", estate:"艾力达庄园", roast_level:"中度烘焙" },
   { name_zh:"Altieri 阿尔铁里庄园 Accio 甄选批次 ALESSA地块 DFC绿顶瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒","干燥冷发酵"], flavor_profile:["玫瑰花","菠萝","芒果","阳光玫瑰","白葡萄","香草奶油","白葡萄酒尾韵"], category:"咖啡", price_unit:{ price:"128-148", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组季军"], origin:"巴拿马", region:"波奎特", estate:"阿尔铁里庄园", roast_level:"中度烘焙" },
@@ -127,204 +136,151 @@ const items = [
   { name_zh:"Finca Deborah黛博拉庄园 25年新产季 共生Symbiosis 延长厌氧日晒瑰夏", ingredient_type:["瑰夏"], processing_method:["厌氧日晒","延长厌氧日晒"], flavor_profile:["红色花香","黑加仑","黑莓","波特酒","果脯","西梅"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["2024 WBrC冠亚季军使用庄园豆"], origin:"巴拿马", region:"火山地区", estate:"黛博拉庄园", roast_level:"中焙" }
 ];
 
-// ======== 价格解析（取区间平均） ========
-function parsePriceAvg(p){
-  if(!p) return NaN; const s = String(p).replace(/[^0-9\-]/g,'');
-  if(!s) return NaN; const parts = s.split('-').map(Number);
-  if(parts.length===1) return parts[0];
-  if(parts.length>=2) return (parts[0]+parts[1])/2;
-  return NaN;
-}
-
-// ======== 词表提取 ========
-function uniq(arr){return [...new Set(arr.filter(Boolean))]}
-const vocab = {
-  ing: uniq(items.flatMap(x=>x.ingredient_type||[])).sort(),
-  proc: uniq(items.flatMap(x=>x.processing_method||[])).sort(),
-  org: uniq(items.map(x=>x.origin).filter(Boolean)).sort(),
-  reg: uniq(items.map(x=>x.region).filter(Boolean)).sort(),
-  est: uniq(items.map(x=>x.estate).filter(Boolean)).sort(),
-  rst: uniq(items.map(x=>x.roast_level).filter(Boolean)).sort(),
-  spc: uniq(items.flatMap(x=>x.special_info||[])).sort(),
-  flv: uniq(items.flatMap(x=>x.flavor_profile||[])).sort()
-};
-
-// ======== 风味家族映射（示例规则，可替换为你的 KB） ========
-const FAMILY_DEF = [
-  {id:'floral',  label:'花香',  color:'#6aa9ff', keys:['花','玉兰','茉莉','栀子','咖啡花','龙眼花','橙花','黄色花香','红色花香']},
-  {id:'citrus',  label:'柑橘',  color:'#5bd3c7', keys:['柠檬','柠檬草','佛手柑','橙','甜橙','柑橘','蜜橘','金桔','柑橘苏打','血橙']},
-  {id:'stone',   label:'核果',  color:'#ffb86b', keys:['杏','杏桃','桃','水蜜桃','甜杏']},
-  {id:'tropical',label:'热带',  color:'#ffd166', keys:['菠萝','芒果','百香果','阳光玫瑰','龙眼']},
-  {id:'berry',   label:'莓果',  color:'#f78da7', keys:['莓','草莓','树莓','蔓越莓','黑莓','黑加仑']},
-  {id:'grape',   label:'葡萄/酒',color:'#a78bfa', keys:['葡萄','白葡萄','白葡萄酒','气泡酒','波特酒']},
-  {id:'sweet',   label:'甜感',  color:'#fcb7af', keys:['蜂蜜','蜂糖','花蜜','糖','糖果','蔗糖','果糖','香草','香草奶油','混合水果糖']},
-  {id:'other',   label:'草本',  color:'#9db2ce', keys:['香料','草本']}
+// ======== 处理法 -> 4 类映射、烘焙常量、庄园、特色 Top5 ========
+const PROC_4 = [
+  {id:'proc.washed',   label:'水洗',   rule:/水洗(?!.*蜜)|暗房水洗|精致水洗/},
+  {id:'proc.natural',  label:'日晒',   rule:/(^|[^厌延])日晒(?!.*蜜)|暗房日晒/},
+  {id:'proc.honey',    label:'蜜处理', rule:/蜜处理/},
+  {id:'proc.special',  label:'特殊处理', rule:/厌氧|二氧化碳|浸渍|发酵|动态发酵|开放发酵|干燥冷发酵/}
 ];
+const ROAST_DISPLAY = '中度烘焙';
+function estateOnly(){ return [...new Set(items.map(x=>x.estate).filter(Boolean))].sort(); }
+function topSpecial(n=5){ const cnt=new Map(); items.forEach(it=> (it.special_info||[]).forEach(s=>cnt.set(s,(cnt.get(s)||0)+1))); return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k,v])=>({name:k,count:v})); }
+function mapProcTo4(methods){ const set=new Set(); (methods||[]).forEach(m=>{ for(const p of PROC_4){ if(p.rule.test(m)){set.add(p.id);break;} } }); return [...set]; }
 
-function flavorToFamily(tag){
-  for(const fam of FAMILY_DEF){
-    if(fam.keys.some(k=>tag.includes(k))) return fam.id;
-  }
-  return 'other';
-}
-
-// ======== 选中状态 ========
-const state = {
-  sort:'',
-  selected:{ing:new Set(),proc:new Set(),org:new Set(),reg:new Set(),est:new Set(),rst:new Set(),spc:new Set(),flv:new Set(),fam:new Set()}
+// ======== 风味分类：家族/类别（两层） ========
+const FLV_TAXON = {
+  family:[
+    {id:'flv.fruit',     label:'水果', color:'#52c7ea'},
+    {id:'flv.floral',    label:'花香', color:'#7eb0ff'},
+    {id:'flv.chocolate', label:'巧克力/可可', color:'#c59e7b'},
+    {id:'flv.spice',     label:'香料', color:'#f6a98a'},
+    {id:'flv.savory',    label:'咸鲜', color:'#9db2ce'},
+    {id:'flv.herb',      label:'草本', color:'#7ad0c1'},
+    {id:'flv.earthy',    label:'泥土&矿物', color:'#b0b7c4'},
+    {id:'flv.nut',       label:'坚果', color:'#e8c48b'}
+  ],
+  class:[
+    {id:'flv.fruit.citrus',     parent:'flv.fruit',     label:'柑橘'},
+    {id:'flv.fruit.berry',      parent:'flv.fruit',     label:'浆果'},
+    {id:'flv.fruit.stonefruit', parent:'flv.fruit',     label:'核果'},
+    {id:'flv.fruit.driedfruit', parent:'flv.fruit',     label:'干果'},
+    {id:'flv.fruit.tropical',   parent:'flv.fruit',     label:'热带水果'},
+    {id:'flv.chocolate.dark',   parent:'flv.chocolate', label:'黑巧克力'},
+    {id:'flv.spice.cinnamon',   parent:'flv.spice',     label:'肉桂'}
+  ]
 };
+const CLASS_KEYS = [
+  {id:'flv.floral', keys:['花','玉兰','茉莉','栀子','咖啡花','龙眼花','橙花','黄色花香','红色花香']},
+  {id:'flv.fruit.citrus', keys:['柠檬','佛手柑','橙','甜橙','柑橘','蜜橘','金桔','柑橘苏打','血橙']},
+  {id:'flv.fruit.berry',  keys:['莓','草莓','树莓','蔓越莓','黑莓','黑加仑']},
+  {id:'flv.fruit.stonefruit', keys:['杏','杏桃','桃','水蜜桃','甜杏']},
+  {id:'flv.fruit.driedfruit', keys:['干','果脯','蜜枣','葡萄干']},
+  {id:'flv.fruit.tropical', keys:['菠萝','芒果','百香果','阳光玫瑰','龙眼']},
+  {id:'flv.chocolate.dark', keys:['黑巧','黑巧克力','可可']},
+  {id:'flv.nut', keys:['坚果','榛子','杏仁','核桃']},
+  {id:'flv.spice.cinnamon', keys:['肉桂']},
+  {id:'flv.savory', keys:['咸','鲜','鲜味','酵母']},
+  {id:'flv.herb', keys:['草本','香草(?!奶油)','薄荷','百里香']},
+  {id:'flv.earthy', keys:['泥土','矿物','岩']},
+  {id:'flv.chocolate', keys:['巧克力','可可']},
+  {id:'flv.sweet', keys:['蜂蜜','花蜜','糖','糖果','蔗糖','果糖','香草','香草奶油','混合水果糖','蜂糖']}
+];
+function mapFlavorToClass(tag){ for(const c of CLASS_KEYS){ if(c.keys.some(k=> new RegExp(k).test(tag))) return c.id; } return 'flv.other'; }
+function classToFamily(cid){ const f=FLV_TAXON.class.find(x=>x.id===cid); if(f) return f.parent; const fam=FLV_TAXON.family.find(x=>x.id===cid); return fam? fam.id : 'flv.other'; }
 
-// ======== DOM refs ========
-const grid = document.getElementById('grid');
-const stats = document.getElementById('stats');
-const activeFilters = document.getElementById('activeFilters');
+// ======== 选中/排序状态 ========
+const state = { sort:'', selected:{ing:new Set(), proc4:new Set(), est:new Set(), spc:new Set(), fam:new Set(), cls:new Set()} };
+function parsePriceAvg(p){ if(!p) return NaN; const s=String(p).replace(/[^0-9\-]/g,''); if(!s) return NaN; const parts=s.split('-').map(Number); return parts.length===1?parts[0]:(parts[0]+parts[1])/2; }
 
-// ======== 标签看板渲染 ========
-function chip(id,label,set,on){
-  const el=document.createElement('div');
-  el.className='chip'+(set.has(id)?' active':'');
-  el.textContent=label;
-  el.onclick=()=>{ set.has(id)?set.delete(id):set.add(id); on?.(); };
-  return el;
-}
+// ======== 面板词表 ========
+const vocab = { ing:[...new Set(items.flatMap(x=>x.ingredient_type||[]))].sort(), proc4: PROC_4.map(p=>({id:p.id,label:p.label})), est: [...new Set(items.map(x=>x.estate).filter(Boolean))].sort(), spcTop5: (function(){const cnt=new Map(); items.forEach(it=> (it.special_info||[]).forEach(s=>cnt.set(s,(cnt.get(s)||0)+1))); return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>({name:k,count:v}));})() };
+
+// ======== 标签看板 ========
+function chip(id,label,set,on){ const el=document.createElement('div'); el.className='chip'+(set.has(id)?' active':''); el.textContent=label; el.onclick=()=>{ set.has(id)?set.delete(id):set.add(id); on?.(); }; return el; }
 function renderBoard(){
-  const mount=(id,gid,set)=>{
-    const wrap=document.getElementById(id); wrap.innerHTML='';
-    vocab[gid].forEach(v=>wrap.appendChild(chip(v,v,set,()=>{renderAll();})));
-  };
-  renderBoard.ingOnce||(renderBoard.ingOnce=true);
-  mount('ingChips','ing',state.selected.ing);
-  mount('procChips','proc',state.selected.proc);
-  mount('orgChips','org',state.selected.org);
-  mount('regChips','reg',state.selected.reg);
-  mount('estChips','est',state.selected.est);
-  mount('rstChips','rst',state.selected.rst);
-  mount('spcChips','spc',state.selected.spc);
+  const ingWrap=document.getElementById('ingChips'); ingWrap.innerHTML=''; vocab.ing.forEach(v=> ingWrap.appendChild(chip(v,v,state.selected.ing,()=>renderAll())));
+  const procWrap=document.getElementById('procChips'); procWrap.innerHTML=''; vocab.proc4.forEach(p=> procWrap.appendChild(chip(p.id,p.label,state.selected.proc4,()=>renderAll())));
+  const estWrap=document.getElementById('estChips'); estWrap.innerHTML=''; vocab.est.forEach(e=> estWrap.appendChild(chip(e,e,state.selected.est,()=>renderAll())));
+  const spcWrap=document.getElementById('spcChips'); spcWrap.innerHTML=''; vocab.spcTop5.forEach(s=> spcWrap.appendChild(chip(s.name,`${s.name} (${s.count})`,state.selected.spc,()=>renderAll())));
 }
 
-// ======== 过滤逻辑 ========
-function matchGroup(vals, set){ if(!set.size) return true; return [...set].some(v=>vals?.includes(v)); }
+// ======== 过滤、徽标、卡片 ========
+function matchOR(vals,set){ if(!set.size) return true; return [...set].some(v=> vals?.includes(v)); }
 function applyFilters(){
-  let arr = items.slice();
-  arr = arr.filter(it=>
-    matchGroup(it.ingredient_type, state.selected.ing) &&
-    matchGroup(it.processing_method, state.selected.proc) &&
-    matchGroup([it.origin], state.selected.org) &&
-    matchGroup([it.region], state.selected.reg) &&
-    matchGroup([it.estate], state.selected.est) &&
-    matchGroup([it.roast_level], state.selected.rst) &&
-    matchGroup(it.special_info, state.selected.spc)
-  );
-  // 风味：优先具体风味，其次家族
-  if(state.selected.flv.size){
-    arr = arr.filter(it => it.flavor_profile && it.flavor_profile.some(f=>state.selected.flv.has(f)));
-  } else if(state.selected.fam.size){
-    arr = arr.filter(it => (it.flavor_profile||[]).some(f=> state.selected.fam.has(flavorToFamily(f)) ));
-  }
-  // 排序
-  if(state.sort==='price-asc') arr = arr.slice().sort((a,b)=>parsePriceAvg(a.price_unit?.price)-parsePriceAvg(b.price_unit?.price));
-  if(state.sort==='price-desc') arr = arr.slice().sort((a,b)=>parsePriceAvg(b.price_unit?.price)-parsePriceAvg(a.price_unit?.price));
+  let arr = items.map(it=> ({...it, proc4: mapProcTo4(it.processing_method)}));
+  arr = arr.filter(it=> matchOR(it.ingredient_type, state.selected.ing) && matchOR(it.proc4, state.selected.proc4) && matchOR([it.estate], state.selected.est) && matchOR(it.special_info, state.selected.spc) );
+  if(state.selected.cls.size){ arr = arr.filter(it => (it.flavor_profile||[]).some(f=> state.selected.cls.has(mapFlavorToClass(f)) )); }
+  else if(state.selected.fam.size){ arr = arr.filter(it => (it.flavor_profile||[]).some(f=> state.selected.fam.has(classToFamily(mapFlavorToClass(f))) )); }
+  if(state.sort==='price-asc') arr=arr.slice().sort((a,b)=>parsePriceAvg(a.price_unit?.price)-parsePriceAvg(b.price_unit?.price));
+  if(state.sort==='price-desc') arr=arr.slice().sort((a,b)=>parsePriceAvg(b.price_unit?.price)-parsePriceAvg(a.price_unit?.price));
   return arr;
 }
+function renderBadges(){ const host=document.getElementById('activeFilters'); host.innerHTML=''; const add=(label,set,mapper=(x)=>x)=>{[...set].forEach(v=>{ const b=document.createElement('div'); b.className='badge'; b.textContent=`${label}: ${mapper(v)}`; host.appendChild(b); });}; add('品种', state.selected.ing); add('处理', state.selected.proc4, id=> (PROC_4.find(p=>p.id===id)||{}).label||id); add('庄园', state.selected.est); add('特色', state.selected.spc); if(state.selected.cls.size){[...state.selected.cls].forEach(id=>{ const lbl=(FLV_TAXON.class.find(x=>x.id===id)||{}).label||id; const b=document.createElement('div'); b.className='badge'; b.textContent=`风味类别: ${lbl}`; host.appendChild(b);});} else if(state.selected.fam.size){[...state.selected.fam].forEach(id=>{ const lbl=(FLV_TAXON.family.find(x=>x.id===id)||{}).label||id; const b=document.createElement('div'); b.className='badge'; b.textContent=`风味家族: ${lbl}`; host.appendChild(b);});} }
+function renderCards(){ const arr=applyFilters(); const host=document.getElementById('grid'); host.innerHTML=''; arr.forEach(it=>{ const el=document.createElement('div'); el.className='card'; const price = it.price_unit?.price?`¥ ${it.price_unit.price}`:'—'; const flavors=(it.flavor_profile||[]).slice(0,6).join(' / '); const proc4 = mapProcTo4(it.processing_method).map(id=> PROC_4.find(p=>p.id===id)?.label).join(' / ')||'—'; el.innerHTML = `<div class="title">${it.name_zh}</div><div class="meta">庄园：${it.estate||'—'}</div><div class="meta">处理：${proc4} · 烘焙：中度烘焙</div><div class="meta">风味：${flavors||'—'}</div><div class="price">${price}</div>`; host.appendChild(el); }); document.getElementById('stats').textContent=`共 ${arr.length} 个结果`; }
 
-// ======== 风味轮（SVG 饼图，按频次占比） ========
-function calcFamilyCounts(arr){
-  const counts = Object.fromEntries(FAMILY_DEF.map(f=>[f.id,0]));
-  arr.forEach(it=> (it.flavor_profile||[]).forEach(tag=>{ counts[flavorToFamily(tag)]++; }));
-  return counts;
-}
-function polar(cx,cy,r,ang){return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)]}
-function arcPath(cx,cy,r,ang0,ang1){
-  const p0=polar(cx,cy,r,ang0), p1=polar(cx,cy,r,ang1);
-  const large = (ang1-ang0)>Math.PI?1:0;
-  return `M ${cx} ${cy} L ${p0[0]} ${p0[1]} A ${r} ${r} 0 ${large} 1 ${p1[0]} ${p1[1]} Z`;
-}
+// ======== 风味轮（增强可读性与交互） ========
 function renderWheel(){
-  const svg = document.getElementById('flavorWheel');
-  svg.innerHTML='';
-  const cx=180, cy=180, r=150;
-  const filteredBase = applyFilters();
-  const counts = calcFamilyCounts(filteredBase);
-  const total = Object.values(counts).reduce((a,b)=>a+b,0) || 1; // 避免除 0
-  let ang= -Math.PI/2; // 从上方开始
-  FAMILY_DEF.forEach(f=>{
-    const frac = counts[f.id]/total; const sweep = frac * Math.PI*2 || (1/FAMILY_DEF.length)*Math.PI*2; // 若为 0，用均分角展示可点击
-    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('d', arcPath(cx,cy,r,ang,ang+sweep));
-    path.setAttribute('fill', f.color);
-    path.setAttribute('opacity', state.selected.fam.size? (state.selected.fam.has(f.id)?1:0.25): 0.9);
-    path.style.cursor='pointer';
-    path.addEventListener('click', ()=>{ if(state.selected.fam.has(f.id)) state.selected.fam.delete(f.id); else state.selected.fam.add(f.id); state.selected.flv.clear(); renderAll(); });
-    svg.appendChild(path);
-    // 中心标签
-    const mid = ang + sweep/2; const [lx,ly] = polar(cx,cy, r*0.62, mid);
-    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
-    text.setAttribute('x', lx); text.setAttribute('y', ly); text.setAttribute('text-anchor','middle'); text.setAttribute('dominant-baseline','middle');
-    text.setAttribute('font-size','12'); text.setAttribute('fill','#0b0c10');
-    text.textContent = `${f.label} ${counts[f.id]||0}`;
-    svg.appendChild(text);
-    ang += sweep;
+  const svg = document.getElementById('flavorWheel'); svg.innerHTML='';
+  const cx=230, cy=230, rBG=205, rIn=95, rOut=185;
+  // 背景渐变与半透明底层，提高暗色背景下的对比度
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const radial=document.createElementNS('http://www.w3.org/2000/svg','radialGradient'); radial.setAttribute('id','bgGrad'); radial.innerHTML = `<stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/><stop offset="65%" stop-color="#ffffff" stop-opacity="0.06"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>`;
+  const sh=document.createElementNS('http://www.w3.org/2000/svg','filter'); sh.setAttribute('id','ds'); sh.innerHTML = `<feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.55"/>`;
+  defs.appendChild(radial); defs.appendChild(sh); svg.appendChild(defs);
+  const bg=document.createElementNS('http://www.w3.org/2000/svg','circle'); bg.setAttribute('cx',cx); bg.setAttribute('cy',cy); bg.setAttribute('r', rBG); bg.setAttribute('fill','url(#bgGrad)'); svg.appendChild(bg);
+  // 分隔环线
+  const sep1=document.createElementNS('http://www.w3.org/2000/svg','circle'); sep1.setAttribute('cx',cx); sep1.setAttribute('cy',cy); sep1.setAttribute('r', rIn); sep1.setAttribute('fill','none'); sep1.setAttribute('stroke','rgba(255,255,255,.15)'); sep1.setAttribute('stroke-width','2'); svg.appendChild(sep1);
+  const sep2=document.createElementNS('http://www.w3.org/2000/svg','circle'); sep2.setAttribute('cx',cx); sep2.setAttribute('cy',cy); sep2.setAttribute('r', rOut); sep2.setAttribute('fill','none'); sep2.setAttribute('stroke','rgba(255,255,255,.12)'); sep2.setAttribute('stroke-width','2'); svg.appendChild(sep2);
+
+  const base = applyFilters();
+  const famCounts = new Map(FLV_TAXON.family.map(f=>[f.id,0]));
+  const clsCounts = new Map(FLV_TAXON.class.map(c=>[c.id,0]));
+  base.forEach(it=> (it.flavor_profile||[]).forEach(tag=>{ const cid=mapFlavorToClass(tag); const fid=classToFamily(cid); famCounts.set(fid,(famCounts.get(fid)||0)+1); if(clsCounts.has(cid)) clsCounts.set(cid,(clsCounts.get(cid)||0)+1); }));
+  const famList=FLV_TAXON.family; const totalFam=[...famCounts.values()].reduce((a,b)=>a+b,0)||famList.length; let ang0=-Math.PI/2; const famAngles={};
+
+  // 内圈 family（带 hover 高亮、描边）
+  famList.forEach(f=>{
+    const c=famCounts.get(f.id)||0; const frac=(c||1)/totalFam; const sweep=frac*Math.PI*2; const seg=drawRingSegment(svg,cx,cy,0,rIn,ang0,ang0+sweep,f.color,state.selected.fam.has(f.id),0.9,true); seg.setAttribute('filter','url(#ds)'); famAngles[f.id]=[ang0,ang0+sweep]; drawLabel(svg,cx,cy,(ang0+ang0+sweep)/2,rIn*0.62,`${f.label} ${c}`,'#0b0c10',12);
+    const hit = drawRingSegment(svg,cx,cy,0,rIn,ang0,ang0+sweep,'transparent',false,1,false); hit.style.cursor='pointer'; hit.addEventListener('mouseenter',()=> seg.setAttribute('opacity','1')); hit.addEventListener('mouseleave',()=> seg.setAttribute('opacity', state.selected.fam.size? (state.selected.fam.has(f.id)?'1':'0.35') : '0.9')); hit.addEventListener('click',()=>{ toggleFamily(f.id); });
+    ang0+=sweep;
   });
-  // 图例
-  const legend = document.getElementById('wheelLegend');
-  legend.innerHTML='';
-  FAMILY_DEF.forEach(f=>{
-    const el=document.createElement('div'); el.className='leg';
-    const sw=document.createElement('span'); sw.className='sw'; sw.style.background=f.color; el.appendChild(sw);
-    const tt=document.createElement('span'); tt.textContent=f.label; el.appendChild(tt);
-    el.style.opacity = state.selected.fam.size? (state.selected.fam.has(f.id)?1:0.5):1;
-    el.onclick=()=>{ if(state.selected.fam.has(f.id)) state.selected.fam.delete(f.id); else state.selected.fam.add(f.id); state.selected.flv.clear(); renderAll(); };
-    legend.appendChild(el);
+
+  // 外圈 class（按 family 均分区间，带 hover 高亮）
+  FLV_TAXON.class.forEach(c=>{
+    const [fa0,fa1]=famAngles[classToFamily(c.id)]||[-Math.PI/2,-Math.PI/2+Math.PI*2/famList.length];
+    const famRange=fa1-fa0; const siblings=FLV_TAXON.class.filter(x=>classToFamily(x.id)===classToFamily(c.id)).map(x=>x.id).sort(); const idx=siblings.indexOf(c.id); const step=famRange/siblings.length; const a0=fa0+idx*step, a1=a0+step;
+    const seg=drawRingSegment(svg,cx,cy,rIn+8,rOut,a0,a1,'#ffffff',state.selected.cls.has(c.id),0.08,true); seg.setAttribute('filter','url(#ds)'); drawLabel(svg,cx,cy,(a0+a1)/2,(rIn+rOut)/2,`${c.label}`,'#0b0c10',11);
+    const hit=drawRingSegment(svg,cx,cy,rIn+8,rOut,a0,a1,'transparent',false,1,false); hit.style.cursor='pointer'; hit.addEventListener('mouseenter',()=> seg.setAttribute('opacity','0.25')); hit.addEventListener('mouseleave',()=> seg.setAttribute('opacity', state.selected.cls.size? (state.selected.cls.has(c.id)?'0.6':'0.08') : '0.08')); hit.addEventListener('click',()=>{ toggleClass(c.id); });
   });
+
+  // 图例（与选择联动）
+  const legend = document.getElementById('wheelLegend'); legend.innerHTML=''; famList.forEach(f=>{ const el=document.createElement('div'); el.className='leg'; const sw=document.createElement('span'); sw.className='sw'; sw.style.background=f.color; el.appendChild(sw); const tt=document.createElement('span'); tt.textContent=f.label; el.appendChild(tt); el.style.opacity = state.selected.fam.size? (state.selected.fam.has(f.id)?1:0.5):1; el.onclick=()=> toggleFamily(f.id); legend.appendChild(el); });
 }
 
-// ======== 结果与徽标 ========
-function renderCards(){
-  const arr = applyFilters();
-  const host = grid; host.innerHTML='';
-  arr.forEach(it=>{
-    const el=document.createElement('div'); el.className='card';
-    const price = it.price_unit?.price ? `¥ ${it.price_unit.price}` : '—';
-    const flavors = (it.flavor_profile||[]).slice(0,6).join(' / ');
-    const proc = (it.processing_method||[]).join(' / ');
-    el.innerHTML = `
-      <div class="title">${it.name_zh}</div>
-      <div class="meta">产地：${it.origin||'—'} · 产区：${it.region||'—'} · 庄园：${it.estate||'—'}</div>
-      <div class="meta">处理：${proc||'—'} · 烘焙：${it.roast_level||'—'}</div>
-      <div class="meta">风味：${flavors||'—'}</div>
-      <div class="price">${price}</div>
-    `;
-    host.appendChild(el);
-  });
-  stats.textContent = `共 ${arr.length} 个结果`;
+function drawRingSegment(svg,cx,cy,rInner,rOuter,a0,a1,color,active=false,opacity=0.9,stroke=true){
+  const large=(a1-a0)>Math.PI?1:0;
+  const [x0i,y0i]=[cx+rInner*Math.cos(a0), cy+rInner*Math.sin(a0)];
+  const [x0o,y0o]=[cx+rOuter*Math.cos(a0), cy+rOuter*Math.sin(a0)];
+  const [x1i,y1i]=[cx+rInner*Math.cos(a1), cy+rInner*Math.sin(a1)];
+  const [x1o,y1o]=[cx+rOuter*Math.cos(a1), cy+rOuter*Math.sin(a1)];
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  const d=[`M ${x0i} ${y0i}`,`L ${x0o} ${y0o}`,`A ${rOuter} ${rOuter} 0 ${large} 1 ${x1o} ${y1o}`,`L ${x1i} ${y1i}`,`A ${rInner} ${rInner} 0 ${large} 0 ${x0i} ${y0i}`,'Z'].join(' ');
+  path.setAttribute('d', d); path.setAttribute('fill', color); path.setAttribute('opacity', active? (rInner>0?0.6:1) : opacity); if(stroke){ path.setAttribute('stroke','rgba(0,0,0,.18)'); path.setAttribute('stroke-width','1'); }
+  svg.appendChild(path); return path;
 }
+function drawLabel(svg,cx,cy,a,r,text,color='#0b0c10',size=12){ const x=cx+r*Math.cos(a), y=cy+r*Math.sin(a); const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('x',x); t.setAttribute('y',y); t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','middle'); t.setAttribute('font-size',String(size)); t.setAttribute('fill',color); t.textContent=text; svg.appendChild(t); }
 
-function renderBadges(){
-  activeFilters.innerHTML='';
-  const push=(label,set)=>{ [...set].forEach(v=>{ const b=document.createElement('div'); b.className='badge'; b.textContent=`${label}: ${v}`; activeFilters.appendChild(b); }); };
-  push('品种', state.selected.ing);
-  push('处理', state.selected.proc);
-  push('国家', state.selected.org);
-  push('产区', state.selected.reg);
-  push('庄园', state.selected.est);
-  push('烘焙', state.selected.rst);
-  push('特色', state.selected.spc);
-  // 家族
-  if(state.selected.fam.size && !state.selected.flv.size){
-    [...state.selected.fam].forEach(fid=>{
-      const fam=FAMILY_DEF.find(x=>x.id===fid); if(!fam) return;
-      const b=document.createElement('div'); b.className='badge'; b.textContent=`风味家族: ${fam.label}`; activeFilters.appendChild(b);
-    })
-  }
-}
+// ======== 交互 ========
+function toggleFamily(fid){ if(state.selected.fam.has(fid)) state.selected.fam.delete(fid); else state.selected.fam.add(fid); state.selected.cls.clear(); renderAll(); }
+function toggleClass(cid){ if(state.selected.cls.has(cid)) state.selected.cls.delete(cid); else state.selected.cls.add(cid); state.selected.fam.clear(); renderAll(); }
 
-// ======== 事件 ========
-const sortSelect=document.getElementById('sortSelect');
-const resetBtn=document.getElementById('resetBtn');
+// ======== 排序/重置 ========
+const sortSelect=document.getElementById('sortSelect'); const resetBtn=document.getElementById('resetBtn');
 sortSelect.onchange=(e)=>{ state.sort=e.target.value; renderCards(); };
 resetBtn.onclick=()=>{ Object.values(state.selected).forEach(s=>s.clear()); state.sort=''; sortSelect.value=''; renderAll(); };
 
-// ======== 总渲染 ========
+// ======== 主渲染 ========
 function renderAll(){ renderBoard(); renderWheel(); renderBadges(); renderCards(); }
 renderAll();
 </script>
