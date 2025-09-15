@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>标签看板 + 风味轮（联动筛选）· 规则增强版</title>
+<style>
+  :root{--bg:#0b0c10;--card:#12151b;--muted:#95a0ad;--fg:#e8edf2;--chip:#1c222c;--chip-a:#2b6cb0;--border:#232a33;--accent:#6aa9ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+  .container{max-width:1200px;margin:36px auto;padding:0 16px}
+  h1{margin:0 0 6px}
+  .sub{color:var(--muted);margin-bottom:18px}
+  .row{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:1100px){.row{grid-template-columns:380px 1fr}}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .section{margin-bottom:12px}
+  .section h3{margin:0 0 8px;font-size:13px;color:#cdd6df;text-transform:uppercase;letter-spacing:.04em}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:6px 10px;border-radius:999px;background:var(--chip);border:1px solid #2a3140;color:#d7deea;cursor:pointer;user-select:none;transition:.15s}
+  .chip:hover{border-color:#374359}
+  .chip.active{background:var(--chip-a);border-color:#2b6cb0}
+  select{background:#0f1320;color:#dfe7f2;border:1px solid #263145;border-radius:10px;padding:8px 10px;min-width:170px}
+  button{background:#162034;color:#dfe7f2;border:1px solid #24324a;border-radius:10px;padding:8px 10px;cursor:pointer}
+  button:hover{border-color:#3b82f6}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{font-size:12px;padding:3px 8px;border:1px solid #2b3545;border-radius:999px;color:#cdd6df;background:#11161f}
+  .muted{color:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:720px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(min-width:1080px){.grid{grid-template-columns:repeat(3,1fr)}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .title{font-weight:700}
+  .meta{font-size:13px;color:#aeb6bf}
+  .price{font-weight:700}
+  .wheel-wrap{display:flex;align-items:center;justify-content:center}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;justify-content:center}
+  .leg{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #2a3140;border-radius:12px;background:#0f1520;font-size:12px}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>标签看板 + 风味轮（联动筛选）· 规则增强</h1>
+    <div class="sub">仅支持<b>价格排序</b>；处理法归为 4 类；烘焙统一显示为「中度烘焙」；产地统一以「庄园」展示；特色信息按出现次数 Top 5；风味轮为两层同心圆（家族/类别）。</div>
+
+    <div class="panel toolbar">
+      <div class="muted">排序：</div>
+      <select id="sortSelect">
+        <option value="">默认排序</option>
+        <option value="price-asc">价格 ↑</option>
+        <option value="price-desc">价格 ↓</option>
+      </select>
+      <div style="flex:1"></div>
+      <button id="resetBtn">重置筛选</button>
+    </div>
+
+    <div class="row">
+      <!-- 左侧：标签看板（Level-2） -->
+      <aside class="panel">
+        <div class="section">
+          <h3>食材品种</h3>
+          <div id="ingChips" class="chips"></div>
+        </div>
+        <div class="section">
+          <h3>处理方式（4 类）</h3>
+          <div id="procChips" class="chips"></div>
+        </div>
+        <div class="section">
+          <h3>产地：庄园</h3>
+          <div class="chips" id="estChips"></div>
+        </div>
+        <div class="section">
+          <h3>特色信息（Top 5）</h3>
+          <div id="spcChips" class="chips"></div>
+        </div>
+      </aside>
+
+      <!-- 右侧：风味轮 + 结果区 -->
+      <main>
+        <div class="panel" style="margin-bottom:12px">
+          <div id="activeFilters" class="badges"></div>
+          <div class="muted" id="stats"></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:12px">
+          <div class="section">
+            <h3>风味轮（内圈：家族；外圈：类别）</h3>
+            <div class="wheel-wrap">
+              <svg id="flavorWheel" width="420" height="420" viewBox="0 0 420 420" role="img" aria-label="风味轮"></svg>
+            </div>
+            <div class="legend" id="wheelLegend"></div>
+          </div>
+        </div>
+
+        <div id="grid" class="grid"></div>
+      </main>
+    </div>
+  </div>
+
+<script>
+// ======== 数据（示例：咖啡类） ========
+const items = [/* 复用之前示例数据（略） */
+  { name_zh:"Finca SantaMaria 圣塔玛利亚庄园 Ghands", ingredient_type:["瑰夏"], processing_method:["日晒","厌氧发酵"], flavor_profile:["橙花","甜橙","杏桃","荔枝","莓果","混合水果糖"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["独家批次","24年BOP瑰夏日晒组第8名"], origin:"巴拿马", region:"奇里基", estate:"圣塔玛利亚庄园", roast_level:"中度烘焙" },
+  { name_zh:"Elida Estate 艾力达庄园 VUELTA地块 EGN DRD 瑰夏暗房日晒", ingredient_type:["瑰夏"], processing_method:["日晒","暗房日晒"], flavor_profile:["玉兰花","橙汁","水蜜桃","葡萄","荔枝","蜂蜜"], category:"咖啡", price_unit:{ price:"158-168", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组冠军","24年BOP竞拍标王"], origin:"巴拿马", region:"波奎特", estate:"艾力达庄园", roast_level:"中度烘焙" },
+  { name_zh:"Altieri 阿尔铁里庄园 Accio 甄选批次 ALESSA地块 DFC绿顶瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒","干燥冷发酵"], flavor_profile:["玫瑰花","菠萝","芒果","阳光玫瑰","白葡萄","香草奶油","白葡萄酒尾韵"], category:"咖啡", price_unit:{ price:"128-148", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组季军"], origin:"巴拿马", region:"波奎特", estate:"阿尔铁里庄园", roast_level:"中度烘焙" },
+  { name_zh:"Elida Estate 艾力达庄园 25新产季 Aguacate地块 EGW DRD 瑰夏水洗暗房干燥", ingredient_type:["瑰夏"], processing_method:["水洗","暗房水洗"], flavor_profile:["姜花","咖啡花","茉莉花","甜柚","佛手柑","柠檬糖"], category:"咖啡", price_unit:{ price:"158-168", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组冠军","24年BOP竞拍标王"], origin:"巴拿马", region:"波奎特", estate:"艾力达庄园", roast_level:"中度烘焙" },
+  { name_zh:"Elida Estate 艾力达庄园 25新产季 VUELTA地块 EGW 水洗绿顶瑰夏", ingredient_type:["瑰夏"], processing_method:["水洗"], flavor_profile:["玉兰花","花香","柑橘苏打","佛手柑","蔗糖","酸质明亮"], category:"咖啡", price_unit:{ price:"158-168", unit:"份", currency:"¥" }, special_info:["24年BOP瑰夏日晒组冠军","24年BOP竞拍标王"], origin:"巴拿马", region:"波奎特", estate:"艾力达庄园", roast_level:"中度烘焙" },
+  { name_zh:"Finca Deborah 黛博拉庄园 25年新产季鲜活 Vivid 二氧化碳日晒发酵水洗干燥瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒","二氧化碳浸渍","发酵","水洗","干燥"], flavor_profile:["黄色花香","蜂迦","气泡酒","水蜜桃","香草"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["24年WBrC冠军","亚军","季军用豆庄园"], origin:"巴拿马", region:"沃肯", estate:"黛博拉庄园", roast_level:"中度烘焙" },
+  { name_zh:"Finca Deborah 黛博拉庄园 25年新产季回声 Echo二氧化碳带果皮浸渍发酵水洗瑰夏", ingredient_type:["瑰夏"], processing_method:["二氧化碳带果皮浸渍发酵","水洗"], flavor_profile:["姜花","花蜜","血橙","树莓","甜橙","草莓酱"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["24年WBrC冠军","亚军","季军用豆庄园"], origin:"巴拿马", region:"沃肯", estate:"黛博拉庄园", roast_level:"中度烘焙" },
+  { name_zh:"Flying Pumas 飞豹庄园 日晒瑰夏 FPNLG24003批次", ingredient_type:["瑰夏"], processing_method:["日晒"], flavor_profile:["热带水果","芒果","百香果","甜橙","蜂糖李"], category:"咖啡", price_unit:{ price:"178-198", unit:"份", currency:"¥" }, special_info:[], origin:"巴拿马", region:"沃肯", estate:"飞豹庄园", roast_level:"中度烘焙" },
+  { name_zh:"Flying Pumas 飞豹庄园 动态发酵水洗瑰夏 Ghands独家 JAGUARUNDI 1.0微批次", ingredient_type:["瑰夏"], processing_method:["动态发酵","水洗"], flavor_profile:["洋甘菊","佛手柑","蜜橘","桃子"], category:"咖啡", price_unit:{ price:"178-198", unit:"份", currency:"¥" }, special_info:["独家","微批次"], origin:"巴拿马", region:"沃肯", estate:"飞豹庄园", roast_level:"中度烘焙" },
+  { name_zh:"Flying Pumas 飞豹庄园 开放发酵水洗瑰夏 FPNLG24010批次", ingredient_type:["瑰夏"], processing_method:["开放发酵","水洗"], flavor_profile:["龙眼花","花香","佛手柑","甜橙","桃子","龙眼","蜜橘"], category:"咖啡", price_unit:{ price:"178-198", unit:"份", currency:"¥" }, special_info:[], origin:"巴拿马", region:"沃肯", estate:"飞豹庄园", roast_level:"中度烘焙" },
+  { name_zh:"Hacienda La Esmeralda 翡翠庄园 Canas Verdes地块 Trapiche批次 红标日晒瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒"], flavor_profile:["玉兰花","柠檬草","柑橘","甜橙","蔓越莓","百香果"], category:"咖啡", price_unit:{ price:"178-198", unit:"份", currency:"¥" }, special_info:["红标日晒","24年BOP瑰夏日晒组第10名"], origin:"巴拿马", region:"波奎特", estate:"翡翠庄园", roast_level:"中度烘焙" },
+  { name_zh:"Finca Los Cenizo圣妮佐庄园 Accio独家甄选批次 水洗瑰夏", ingredient_type:["瑰夏"], processing_method:["水洗"], flavor_profile:["茉莉花","玫瑰花","佛手柑","甜杏","水蜜桃","柠檬","蜂蜜"], category:"咖啡", price_unit:{ price:"198-218", unit:"份", currency:"¥" }, special_info:["独家甄选批次","2024 BOP水洗瑰夏组第6名"], origin:"巴拿马", region:"奇里基省 Cerro Punta", estate:"圣妮佐庄园", roast_level:"中焙" },
+  { name_zh:"Finca Los Cenizo圣妮佐庄园 Accio独家甄选批次 日晒绿顶瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒"], flavor_profile:["玫瑰花","香水柠檬","蜜瓜","杏桃","菠萝","玫瑰花蜜"], category:"咖啡", price_unit:{ price:"218-238", unit:"份", currency:"¥" }, special_info:["独家甄选批次","2024 BOP日晒瑰夏组第12名"], origin:"巴拿马", region:"奇里基省 Cerro Punta", estate:"圣妮佐庄园", roast_level:"中焙" },
+  { name_zh:"Sophia Estate索菲亚庄园 晚收批次#25 日晒瑰夏", ingredient_type:["瑰夏"], processing_method:["日晒"], flavor_profile:["花香","佛手柑","柠檬草","蜜枣","果糖"], category:"咖啡", price_unit:{ price:"238-258", unit:"份", currency:"¥" }, special_info:["晚收批次","2024 BOP亚洲水洗组第5名","日晒组第5名"], origin:"巴拿马", region:"波奎特", estate:"索菲亚庄园", roast_level:"中焙" },
+  { name_zh:"LongBoard冲浪板庄园 雾山地块 Ghands独家批次 MMGH42 蜜处理瑰夏", ingredient_type:["瑰夏"], processing_method:["蜜处理"], flavor_profile:["栀子花","金桔","红布林","粉心芭乐","水蜜桃","甘蔗汁","花蜜"], category:"咖啡", price_unit:{ price:"368-398", unit:"份", currency:"¥" }, special_info:["独家批次","2024 BOP水洗瑰夏组第14名"], origin:"巴拿马", region:"波奎特", estate:"冲浪板庄园", roast_level:"中焙" },
+  { name_zh:"Finca Nuguo努果庄园 25新产季 精致水洗瑰夏#731", ingredient_type:["瑰夏"], processing_method:["精致水洗"], flavor_profile:["金银花","花蜜","糖果","血橙","白桃"], category:"咖啡", price_unit:{ price:"278-298", unit:"份", currency:"¥" }, special_info:["2024 BOP水洗瑰夏组第3名"], origin:"巴拿马", region:"奇里基省", estate:"努果庄园", roast_level:"中焙" },
+  { name_zh:"Finca Deborah黛博拉庄园 25年新产季 共生Symbiosis 延长厌氧日晒瑰夏", ingredient_type:["瑰夏"], processing_method:["厌氧日晒","延长厌氧日晒"], flavor_profile:["红色花香","黑加仑","黑莓","波特酒","果脯","西梅"], category:"咖啡", price_unit:{ price:"168-188", unit:"份", currency:"¥" }, special_info:["2024 WBrC冠亚季军使用庄园豆"], origin:"巴拿马", region:"火山地区", estate:"黛博拉庄园", roast_level:"中焙" }
+];
+
+// ======== 1) 处理法 -> 4 类映射 ========
+const PROC_4 = [
+  {id:'proc.washed',   label:'水洗',   rule:/水洗(?!.*蜜)|暗房水洗|精致水洗/},
+  {id:'proc.natural',  label:'日晒',   rule:/(^|[^厌延])日晒(?!.*蜜)|暗房日晒/},
+  {id:'proc.honey',    label:'蜜处理', rule:/蜜处理/},
+  {id:'proc.special',  label:'特殊处理', rule:/厌氧|二氧化碳|浸渍|发酵|动态发酵|开放发酵|干燥冷发酵/}
+];
+function mapProcTo4(methods){
+  const set = new Set();
+  (methods||[]).forEach(m=>{
+    for(const p of PROC_4){ if(p.rule.test(m)) { set.add(p.id); break; } }
+  });
+  return [...set];
+}
+
+// ======== 2) 烘焙度统一显示 ========
+const ROAST_DISPLAY = '中度烘焙';
+
+// ======== 3) 产地统一展示到「庄园」 ========
+function estateOnly(){
+  return [...new Set(items.map(x=>x.estate).filter(Boolean))].sort();
+}
+
+// ======== 4) 特色信息 Top 5（按出现次数倒序） ========
+function topSpecial(n=5){
+  const cnt = new Map();
+  items.forEach(it=> (it.special_info||[]).forEach(s=>cnt.set(s,(cnt.get(s)||0)+1)) );
+  return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k,v])=>({name:k,count:v}));
+}
+
+// ======== 5) 风味轮两层：家族(family)/类别(class) ========
+const FLV_TAXON = {
+  family:[
+    {id:'flv.fruit',     label:'水果', color:'#52c7ea'},
+    {id:'flv.floral',    label:'花香', color:'#7eb0ff'},
+    {id:'flv.chocolate', label:'巧克力/可可', color:'#c59e7b'},
+    {id:'flv.spice',     label:'香料', color:'#f6a98a'},
+    {id:'flv.savory',    label:'咸鲜', color:'#9db2ce'},
+    {id:'flv.herb',      label:'草本', color:'#7ad0c1'},
+    {id:'flv.earthy',    label:'泥土&矿物', color:'#b0b7c4'},
+    {id:'flv.nut',       label:'坚果', color:'#e8c48b'} // 直接挂在根上
+  ],
+  class:[
+    {id:'flv.fruit.citrus',     parent:'flv.fruit',     label:'柑橘'},
+    {id:'flv.fruit.berry',      parent:'flv.fruit',     label:'浆果'},
+    {id:'flv.fruit.stonefruit', parent:'flv.fruit',     label:'核果'},
+    {id:'flv.fruit.driedfruit', parent:'flv.fruit',     label:'干果'},
+    {id:'flv.fruit.tropical',   parent:'flv.fruit',     label:'热带水果'},
+    {id:'flv.chocolate.dark',   parent:'flv.chocolate', label:'黑巧克力'},
+    {id:'flv.spice.cinnamon',   parent:'flv.spice',     label:'肉桂'}
+  ]
+};
+
+// 具体风味关键词 -> class 映射（示例，可换成你的词典）
+const CLASS_KEYS = [
+  {id:'flv.floral', keys:['花','玉兰','茉莉','栀子','咖啡花','龙眼花','橙花','黄色花香','红色花香']},
+  {id:'flv.fruit.citrus', keys:['柠檬','佛手柑','橙','甜橙','柑橘','蜜橘','金桔','柑橘苏打','血橙']},
+  {id:'flv.fruit.berry',  keys:['莓','草莓','树莓','蔓越莓','黑莓','黑加仑']},
+  {id:'flv.fruit.stonefruit', keys:['杏','杏桃','桃','水蜜桃','甜杏']},
+  {id:'flv.fruit.driedfruit', keys:['干','果脯','蜜枣','葡萄干']},
+  {id:'flv.fruit.tropical', keys:['菠萝','芒果','百香果','阳光玫瑰','龙眼']},
+  {id:'flv.chocolate.dark', keys:['黑巧','黑巧克力','可可']},
+  {id:'flv.nut', keys:['坚果','榛子','杏仁','核桃']},
+  {id:'flv.spice.cinnamon', keys:['肉桂']},
+  {id:'flv.savory', keys:['咸','鲜','鲜味','酵母']},
+  {id:'flv.herb', keys:['草本','香草(?!奶油)','薄荷','百里香']},
+  {id:'flv.earthy', keys:['泥土','矿物','岩']},
+  {id:'flv.chocolate', keys:['巧克力','可可']},
+  {id:'flv.sweet', keys:['蜂蜜','花蜜','糖','糖果','蔗糖','果糖','香草','香草奶油','混合水果糖','蜂糖']}
+];
+
+function mapFlavorToClass(tag){
+  for(const c of CLASS_KEYS){
+    if(c.keys.some(k=> new RegExp(k).test(tag))) return c.id;
+  }
+  return 'flv.other';
+}
+function classToFamily(cid){
+  const f = FLV_TAXON.class.find(x=>x.id===cid);
+  if(f) return f.parent;
+  // 若 class 直接在根上（如 flv.floral, flv.nut, flv.savory 等），其自身作为 family
+  const fam = FLV_TAXON.family.find(x=>x.id===cid);
+  return fam? fam.id : 'flv.other';
+}
+
+// ======== 选中状态 ========
+const state = {
+  sort:'',
+  selected:{ing:new Set(), proc4:new Set(), est:new Set(), spc:new Set(), fam:new Set(), cls:new Set()}
+};
+
+// ======== 价格解析（用于排序） ========
+function parsePriceAvg(p){
+  if(!p) return NaN; const s=String(p).replace(/[^0-9\-]/g,''); if(!s) return NaN;
+  const parts=s.split('-').map(Number); return parts.length===1?parts[0]:(parts[0]+parts[1])/2;
+}
+
+// ======== 词表/面板数据 ========
+const vocab = {
+  ing: [...new Set(items.flatMap(x=>x.ingredient_type||[]))].sort(),
+  proc4: PROC_4.map(p=>({id:p.id,label:p.label})),
+  est: estateOnly(),
+  spcTop5: topSpecial(5)
+};
+
+// ======== 标签看板渲染 ========
+function chip(id,label,set,on){
+  const el=document.createElement('div'); el.className='chip'+(set.has(id)?' active':''); el.textContent=label;
+  el.onclick=()=>{ set.has(id)?set.delete(id):set.add(id); on?.(); };
+  return el;
+}
+function renderBoard(){
+  // 品种
+  const ingWrap=document.getElementById('ingChips'); ingWrap.innerHTML='';
+  vocab.ing.forEach(v=> ingWrap.appendChild(chip(v,v,state.selected.ing,()=>renderAll())));
+  // 处理法 4 类
+  const procWrap=document.getElementById('procChips'); procWrap.innerHTML='';
+  vocab.proc4.forEach(p=> procWrap.appendChild(chip(p.id,p.label,state.selected.proc4,()=>renderAll())));
+  // 庄园
+  const estWrap=document.getElementById('estChips'); estWrap.innerHTML='';
+  vocab.est.forEach(e=> estWrap.appendChild(chip(e,e,state.selected.est,()=>renderAll())));
+  // 特色 Top5（倒序）
+  const spcWrap=document.getElementById('spcChips'); spcWrap.innerHTML='';
+  vocab.spcTop5.forEach(s=> spcWrap.appendChild(chip(s.name,`${s.name} (${s.count})`,state.selected.spc,()=>renderAll())));
+}
+
+// ======== 过滤逻辑 ========
+function matchOR(vals,set){ if(!set.size) return true; return [...set].some(v=> vals?.includes(v)); }
+function applyFilters(){
+  let arr = items.slice();
+  // 处理法映射
+  arr = arr.map(it=> ({...it, proc4: mapProcTo4(it.processing_method)}));
+  // 过滤：品种 / 处理法4类 / 庄园 / 特色
+  arr = arr.filter(it=>
+    matchOR(it.ingredient_type, state.selected.ing) &&
+    matchOR(it.proc4, state.selected.proc4) &&
+    matchOR([it.estate], state.selected.est) &&
+    matchOR(it.special_info, state.selected.spc)
+  );
+  // 风味：优先 class，其次 family
+  if(state.selected.cls.size){
+    arr = arr.filter(it => (it.flavor_profile||[]).some(f=> state.selected.cls.has(mapFlavorToClass(f)) ));
+  } else if(state.selected.fam.size){
+    arr = arr.filter(it => (it.flavor_profile||[]).some(f=> state.selected.fam.has(classToFamily(mapFlavorToClass(f))) ));
+  }
+  // 排序
+  if(state.sort==='price-asc') arr = arr.slice().sort((a,b)=>parsePriceAvg(a.price_unit?.price)-parsePriceAvg(b.price_unit?.price));
+  if(state.sort==='price-desc') arr = arr.slice().sort((a,b)=>parsePriceAvg(b.price_unit?.price)-parsePriceAvg(a.price_unit?.price));
+  return arr;
+}
+
+// ======== 风味轮（两层同心圆） ========
+function renderWheel(){
+  const svg = document.getElementById('flavorWheel'); svg.innerHTML='';
+  const cx=210, cy=210, rIn=90, rOut=170;
+  const base = applyFilters();
+  // 统计：以具体风味 -> class -> family 聚合
+  const famCounts = new Map(FLV_TAXON.family.map(f=>[f.id,0]));
+  const clsCounts = new Map(FLV_TAXON.class.map(c=>[c.id,0]));
+  base.forEach(it=> (it.flavor_profile||[]).forEach(tag=>{
+    const cid = mapFlavorToClass(tag); const fid = classToFamily(cid);
+    famCounts.set(fid, (famCounts.get(fid)||0)+1);
+    if(clsCounts.has(cid)) clsCounts.set(cid, (clsCounts.get(cid)||0)+1);
+  }));
+  const famList = FLV_TAXON.family;
+  const totalFam = [...famCounts.values()].reduce((a,b)=>a+b,0) || famList.length;
+  let ang0 = -Math.PI/2;
+  const famAngles = {};
+  // 画内圈（family）
+  famList.forEach(f=>{
+    const c = famCounts.get(f.id)||0; const frac = (c||1)/totalFam; // 无数据也分一份，保证可点
+    const sweep = frac * Math.PI*2;
+    drawRingSegment(svg, cx, cy, 0, rIn, ang0, ang0+sweep, f.color, state.selected.fam.has(f.id));
+    famAngles[f.id] = [ang0, ang0+sweep];
+    // 标签
+    drawLabel(svg, cx, cy, (ang0+ang0+sweep)/2, rIn*0.65, `${f.label} ${c}`);
+    ang0 += sweep;
+  });
+  // 画外圈（class，按其 family 角区间再细分）
+  FLV_TAXON.class.forEach(c=>{
+    const [fa0,fa1] = famAngles[classToFamily(c.id)] || [-Math.PI/2, -Math.PI/2+Math.PI*2/FLV_TAXON.family.length];
+    const famRange = fa1-fa0; const cCount = clsCounts.get(c.id)||0; const cFrac = Math.max(cCount,1) / Math.max(1, [...FLV_TAXON.class.filter(x=>classToFamily(x.id)===classToFamily(c.id)).map(x=>clsCounts.get(x.id)||0)].reduce((a,b)=>a+b,0) || 1);
+    const cSweep = cFrac * famRange;
+    // 在 family 区间内平均铺开（简化：按顺序均分）
+    // 为稳定排序，取 class 名称排序后位置
+    const siblings = FLV_TAXON.class.filter(x=>classToFamily(x.id)===classToFamily(c.id)).map(x=>x.id).sort();
+    const idx = siblings.indexOf(c.id); const step = famRange/siblings.length;
+    const a0 = fa0 + idx*step, a1 = a0 + step;
+    drawRingSegment(svg, cx, cy, rIn+8, rOut, a0, a1, '#ffffff', state.selected.cls.has(c.id), 0.08);
+    // 外圈小标签
+    drawLabel(svg, cx, cy, (a0+a1)/2, (rIn+rOut)/2, `${c.label}`,'#0b0c10',10);
+    // 点击区域（透明层）
+    const hit = drawRingSegment(svg, cx, cy, rIn+8, rOut, a0, a1, 'transparent', false, 1);
+    hit.style.cursor='pointer';
+    hit.addEventListener('click', ()=>{ toggleClass(c.id); });
+  });
+  // family 点击区域
+  famList.forEach(f=>{
+    const [a0,a1]=famAngles[f.id];
+    const hit = drawRingSegment(svg, cx, cy, 0, rIn, a0, a1, 'transparent', false, 1);
+    hit.style.cursor='pointer';
+    hit.addEventListener('click', ()=>{ toggleFamily(f.id); });
+  });
+  // 图例
+  const legend = document.getElementById('wheelLegend'); legend.innerHTML='';
+  famList.forEach(f=>{
+    const el=document.createElement('div'); el.className='leg';
+    const sw=document.createElement('span'); sw.className='sw'; sw.style.background=f.color; el.appendChild(sw);
+    const tt=document.createElement('span'); tt.textContent=f.label; el.appendChild(tt);
+    el.style.opacity = state.selected.fam.size? (state.selected.fam.has(f.id)?1:0.5):1;
+    el.onclick=()=> toggleFamily(f.id);
+    legend.appendChild(el);
+  });
+}
+
+function drawRingSegment(svg, cx, cy, rInner, rOuter, a0, a1, color, active=false, opacity=0.9){
+  // 画一个环形扇区
+  const large = (a1-a0)>Math.PI?1:0;
+  const [x0i,y0i]=[cx+rInner*Math.cos(a0), cy+rInner*Math.sin(a0)];
+  const [x0o,y0o]=[cx+rOuter*Math.cos(a0), cy+rOuter*Math.sin(a0)];
+  const [x1i,y1i]=[cx+rInner*Math.cos(a1), cy+rInner*Math.sin(a1)];
+  const [x1o,y1o]=[cx+rOuter*Math.cos(a1), cy+rOuter*Math.sin(a1)];
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  const d = [
+    `M ${x0i} ${y0i}`,
+    `L ${x0o} ${y0o}`,
+    `A ${rOuter} ${rOuter} 0 ${large} 1 ${x1o} ${y1o}`,
+    `L ${x1i} ${y1i}`,
+    `A ${rInner} ${rInner} 0 ${large} 0 ${x0i} ${y0i}`,
+    'Z'
+  ].join(' ');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', color);
+  path.setAttribute('opacity', active?1:opacity);
+  svg.appendChild(path);
+  return path;
+}
+function drawLabel(svg, cx, cy, a, r, text, color='#0b0c10', size=12){
+  const x=cx+r*Math.cos(a), y=cy+r*Math.sin(a);
+  const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x', x); t.setAttribute('y', y); t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','middle');
+  t.setAttribute('font-size', String(size)); t.setAttribute('fill', color);
+  t.textContent = text; svg.appendChild(t);
+}
+
+function toggleFamily(fid){
+  if(state.selected.fam.has(fid)) state.selected.fam.delete(fid); else state.selected.fam.add(fid);
+  state.selected.cls.clear(); // 选择家族时清空具体类别
+  renderAll();
+}
+function toggleClass(cid){
+  if(state.selected.cls.has(cid)) state.selected.cls.delete(cid); else state.selected.cls.add(cid);
+  state.selected.fam.clear(); // 选择类别时清空家族
+  renderAll();
+}
+
+// ======== 结果卡片 ========
+function renderCards(){
+  const arr = applyFilters();
+  const host = document.getElementById('grid'); host.innerHTML='';
+  arr.forEach(it=>{
+    const el=document.createElement('div'); el.className='card';
+    const price = it.price_unit?.price ? `¥ ${it.price_unit.price}` : '—';
+    const flavors = (it.flavor_profile||[]).slice(0,6).join(' / ');
+    const proc4 = mapProcTo4(it.processing_method).map(id=> PROC_4.find(p=>p.id===id)?.label).join(' / ') || '—';
+    el.innerHTML = `
+      <div class="title">${it.name_zh}</div>
+      <div class="meta">庄园：${it.estate||'—'}</div>
+      <div class="meta">处理：${proc4} · 烘焙：${ROAST_DISPLAY}</div>
+      <div class="meta">风味：${flavors||'—'}</div>
+      <div class="price">${price}</div>
+    `;
+    host.appendChild(el);
+  });
+  document.getElementById('stats').textContent = `共 ${arr.length} 个结果`;
+}
+
+function renderBadges(){
+  const host=document.getElementById('activeFilters'); host.innerHTML='';
+  const addSet=(label,set)=>{[...set].forEach(v=>{const b=document.createElement('div'); b.className='badge'; b.textContent=`${label}: ${v}`; host.appendChild(b);});};
+  addSet('品种', state.selected.ing);
+  addSet('处理', new Set([...state.selected.proc4].map(id=> PROC_4.find(p=>p.id===id)?.label)));
+  addSet('庄园', state.selected.est);
+  addSet('特色', state.selected.spc);
+  // 风味
+  if(state.selected.cls.size){ [...state.selected.cls].forEach(id=>{ const lbl= (FLV_TAXON.class.find(x=>x.id===id)||{}).label||id; const b=document.createElement('div'); b.className='badge'; b.textContent=`风味类别: ${lbl}`; host.appendChild(b); }); }
+  else if(state.selected.fam.size){ [...state.selected.fam].forEach(id=>{ const lbl=(FLV_TAXON.family.find(x=>x.id===id)||{}).label||id; const b=document.createElement('div'); b.className='badge'; b.textContent=`风味家族: ${lbl}`; host.appendChild(b); }); }
+}
+
+// ======== 事件 ========
+const sortSelect=document.getElementById('sortSelect');
+const resetBtn=document.getElementById('resetBtn');
+sortSelect.onchange=(e)=>{ state.sort=e.target.value; renderCards(); };
+resetBtn.onclick=()=>{ Object.values(state.selected).forEach(s=>s.clear()); state.sort=''; sortSelect.value=''; renderAll(); };
+
+// ======== 启动 ========
+function renderAll(){ renderBoard(); renderWheel(); renderBadges(); renderCards(); }
+renderAll();
+</script>
+</body>
+</html>
