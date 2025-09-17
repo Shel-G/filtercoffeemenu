@@ -87,6 +87,7 @@
     background: var(--card-bg); border: 1px solid var(--panel-border);
     border-radius: 12px; padding: 1rem; backdrop-filter: blur(5px);
     transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: default;
+    position: relative;
   }
   .card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 0 1px var(--accent-hover); }
   .meta{color:var(--text-muted);font-size:12px;margin: 8px 0; min-height:32px}
@@ -94,7 +95,7 @@
 
   .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px;}
   .card-header h3 { flex-grow: 1; }
-  .like-button { cursor: pointer; padding: 4px; margin-top: -6px; margin-right: -6px; }
+  .like-button { cursor: pointer; padding: 4px; margin-top: -6px; margin-right: -6px; z-index: 10;}
   .heart-icon { width: 20px; height: 20px; stroke: var(--text-muted); stroke-width: 1.5; fill: none; transition: all 0.2s ease-in-out; }
   .like-button:hover .heart-icon { stroke: var(--accent); }
   .heart-icon.liked { stroke: var(--heart-liked); fill: var(--heart-liked); animation: heartBeat 0.3s ease-in-out; }
@@ -367,11 +368,17 @@ function orgMatch(it){
   return ok;
 }
 function matchOR(set, arr, mapfn){ if(!set.size) return true; const keys=[...set]; return keys.some(k=> arr.some(t=>mapfn(t,k))); }
+function areFiltersActive() {
+    return SELECTED.ing.size > 0 || SELECTED.proc.size > 0 || SELECTED.rst.size > 0 ||
+           SELECTED.spc.size > 0 || SELECTED.flvL2.size > 0 || SELECTED.flvL3.size > 0 ||
+           SELECTED.org.country.size > 0 || SELECTED.org.region.size > 0 || SELECTED.org.estate.size > 0 ||
+           SELECTED.price[0] !== 120 || SELECTED.price[1] !== 400;
+}
 function filterItems(){
   return ITEMS.filter(it=>{
     const ap = avgPrice(it);
     if(ap < SELECTED.price[0] || ap > SELECTED.price[1]) return false;
-    if(SELECTED.proc.size && !SELECTED.proc.has(it.proc)) return false; // Updated proc filter
+    if(SELECTED.proc.size && !SELECTED.proc.has(it.proc)) return false; 
     if(!matchOR(SELECTED.ing, it.ing||[], (t,k)=>t===k)) return false;
     if(!matchOR(SELECTED.rst, [it.rst], (t,k)=>t===k)) return false;
     if(!matchOR(SELECTED.spc, it.spc||[], (t,k)=>t===k)) return false;
@@ -385,7 +392,7 @@ function buildCounts(list){
   const C={ ing:new Map(), proc:new Map(), rst:new Map(), spc:new Map(), flvL2:new Map(), org:{country:new Map(), region:new Map(), estate:new Map()} };
   list.forEach(it=>{
     (it.ing||[]).forEach(t=>C.ing.set(t,(C.ing.get(t)||0)+1));
-    C.proc.set(it.proc, (C.proc.get(it.proc) || 0) + 1); // Updated proc count
+    C.proc.set(it.proc, (C.proc.get(it.proc) || 0) + 1);
     C.rst.set(it.rst,(C.rst.get(it.rst)||0)+1);
     (it.spc||[]).forEach(t=>C.spc.set(t,(C.spc.get(t)||0)+1));
     (it.flv||[]).forEach(t=>{const k=prefix(t,2); C.flvL2.set(k,(C.flvL2.get(k)||0)+1)});
@@ -485,12 +492,15 @@ function refreshMap(list){
   list.forEach(it=>{ const p=it.org.replace(/^org\./,''); let k=p; if(!(k in GEO)) k=p.split('.').slice(0,2).join('.'); if(!(k in GEO)) k=p.split('.')[0]; counts.set(k,(counts.get(k)||0)+1); });
   counts.forEach((c,key)=>{
     const g=GEO[key]; if(!g) return;
-    const marker=L.circleMarker([g.lat,g.lon],{ radius: Math.max(5, Math.min(15, 4+Math.sqrt(c*2))), color:'var(--accent)', weight:1.5, fillColor:'var(--accent-hover)', fillOpacity:.5 }).bindPopup(`${getLabelZh(g.label.toLowerCase())} · ${c} 款`);
+    const marker=L.circleMarker([g.lat,g.lon],{ radius: Math.max(5, Math.min(15, 4+Math.sqrt(c*2))), color:'var(--accent)', weight:1.5, fillColor:'var(--accent-hover)', fillOpacity:.5 })
+      .bindTooltip(`${getLabelZh(g.label.toLowerCase())} · ${c} 款`, { permanent: false, direction: 'top', sticky: true });
+    
     marker.on('click', ()=>{
+      SELECTED.org.country.clear(); SELECTED.org.region.clear(); SELECTED.org.estate.clear();
       const seg=key.split('.');
-      if(seg.length===3){ const k=`${seg[0]}.${seg[1]}.${seg[2]}`; const s=SELECTED.org.estate; s.has(k)?s.delete(k):s.add(k); }
-      else if(seg.length===2){ const k=`${seg[0]}.${seg[1]}`; const s=SELECTED.org.region; s.has(k)?s.delete(k):s.add(k); }
-      else { const s=SELECTED.org.country; s.has(seg[0])?s.delete(seg[0]):s.add(seg[0]); }
+      if(seg.length===3){ SELECTED.org.estate.add(`${seg[0]}.${seg[1]}.${seg[2]}`); }
+      else if(seg.length===2){ SELECTED.org.region.add(`${seg[0]}.${seg[1]}`); }
+      else { SELECTED.org.country.add(seg[0]); }
       refreshAll();
     });
     layerGroup.addLayer(marker);
@@ -566,7 +576,9 @@ tabs.addEventListener('click',e=>{
 });
 
 function refreshAll(){
-  const list=filterItems();
+  const list = filterItems();
+  const filtersActive = areFiltersActive();
+
   renderCards(list);
   const resultsPanel = document.getElementById('results-panel');
   if (list.length > 0) {
@@ -577,10 +589,19 @@ function refreshAll(){
   } else {
     resultsPanel.style.display = 'none';
   }
-  if (currentPane === 'wheel') refreshWheel(list);
-  if (currentPane === 'map') refreshMap(list);
-  if (currentPane === 'matrix') renderMouthfeelMatrix(list);
-  const counts=buildCounts(ITEMS);
+
+  // 根据当前Tab和筛选状态决定渲染内容
+  if (currentPane === 'wheel') {
+    refreshWheel(filtersActive ? list : ITEMS);
+  }
+  if (currentPane === 'map') {
+    refreshMap(filtersActive ? list : ITEMS);
+  }
+  if (currentPane === 'matrix') {
+    refreshMouthfeelMatrix(list);
+  }
+  
+  const counts = buildCounts(ITEMS);
   renderChips(counts);
 }
 
